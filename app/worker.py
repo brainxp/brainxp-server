@@ -7,7 +7,9 @@ import signal
 import uuid
 
 from app import queue as Q
+from app import tables as T
 from app.db import dispose, engine
+from app.services.generation import publish
 from app.services.generation import run as run_generation
 
 logging.basicConfig(
@@ -17,6 +19,22 @@ logging.basicConfig(
 log = logging.getLogger("brainxp.worker")
 
 HANDLERS = {"generate": lambda db, p: run_generation(db, uuid.UUID(p["material_id"]))}
+
+
+async def abandon(job: dict) -> None:
+    material_id = job.get("material_id")
+    if not material_id:
+        return
+    try:
+        async with engine().begin() as db:
+            await db.execute(
+                T.materials.update()
+                .where(T.materials.c.id == uuid.UUID(material_id))
+                .values(status="failed", gate_reason="internal_error")
+            )
+        await publish(uuid.UUID(material_id), {"stage": "failed", "reason": "internal_error"})
+    except Exception:
+        log.exception("gagal menandai materi %s sebagai gagal", material_id)
 
 
 async def handle(raw: str, job: dict) -> None:
@@ -32,6 +50,7 @@ async def handle(raw: str, job: dict) -> None:
             await fn(db, job)
     except Exception:
         log.exception("pekerjaan %s gagal: %s", kind, job)
+        await abandon(job)
     finally:
         await Q.acknowledge(raw)
 
