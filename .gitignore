@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+*.md
+!README.md
+!API.md
+deploy/garage.toml
+
+.DS_Store
+.serena/
