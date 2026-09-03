@@ -141,25 +141,36 @@ async def stream_material(material_id: uuid.UUID, db: Conn, me: Me):
         raise NotFound("Materi tidak ditemukan.")
     await authorize_subject(db, me, row[0])
 
-    async def events():
-        last = await Q.redis().get(f"brainxp:material:last:{material_id}")
-        if last:
-            yield f"data: {last}\n\n"
-            if json.loads(last).get("stage") in ("ready", "rejected", "failed"):
-                return
+    terminal = ("ready", "rejected", "failed")
+    snapshot_key = f"brainxp:material:last:{material_id}"
 
+    async def events():
         pubsub = Q.redis().pubsub()
         await pubsub.subscribe(CHANNEL.format(material_id))
         try:
+            snapshot = await Q.redis().get(snapshot_key)
+            if snapshot:
+                yield f"data: {snapshot}\n\n"
+                if json.loads(snapshot).get("stage") in terminal:
+                    return
+
             deadline = asyncio.get_running_loop().time() + 180
             while asyncio.get_running_loop().time() < deadline:
-                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=10.0)
-                if msg is None:
-                    yield ": keep-alive\n\n"
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=5.0)
+                if msg is not None:
+                    yield f"data: {msg['data']}\n\n"
+                    if json.loads(msg["data"]).get("stage") in terminal:
+                        return
                     continue
-                yield f"data: {msg['data']}\n\n"
-                if json.loads(msg["data"]).get("stage") in ("ready", "rejected", "failed"):
-                    return
+
+                latest = await Q.redis().get(snapshot_key)
+                if latest and latest != snapshot:
+                    snapshot = latest
+                    yield f"data: {latest}\n\n"
+                    if json.loads(latest).get("stage") in terminal:
+                        return
+                    continue
+                yield ": keep-alive\n\n"
         finally:
             await pubsub.unsubscribe(CHANNEL.format(material_id))
             await pubsub.aclose()
