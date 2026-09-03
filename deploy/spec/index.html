@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrainXP API</title>
+<meta name="description" content="API reference for BrainXP, generated from the source.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('brainxp.spec.theme') } catch (e) {}
+    var mode = saved === 'light' || saved === 'dark' ? saved : 'system';
+    var dark = mode === 'dark' ||
+      (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.dataset.mode = mode;
+  })();
+</script>
+<style>
+  :root{
+    --b900:#08152F; --b800:#0C2350; --b700:#123A85; --b600:#1A56C4; --b500:#2F6FE4;
+    --b300:#9DBEF8; --b100:#DDE8FD; --b50:#F2F6FE;
+    --n900:#0C1220; --n800:#1B2436; --n700:#39435A; --n500:#6B7488; --n400:#98A0B2;
+    --n300:#C8CFDC; --n200:#E5E9F1; --n100:#F0F3F8; --n0:#FFFFFF;
+  }
+  :root[data-theme="light"]{
+    --page:#FFFFFF; --panel:#F7F9FC; --line:#E5E9F1; --line-2:#C8CFDC;
+    --ink:#0C1220; --ink-2:#39435A; --ink-3:#6B7488;
+    --accent:#1A56C4; --accent-2:#2F6FE4; --accent-soft:#DDE8FD; --accent-ink:#123A85;
+    --chip:#FFFFFF; --bar:rgba(255,255,255,.9);
+  }
+  :root[data-theme="dark"]{
+    --page:#08152F; --panel:#06101F; --line:#17325C; --line-2:#1E4179;
+    --ink:#EAF1FE; --ink-2:#A9BEE4; --ink-3:#7C93BC;
+    --accent:#7FA8F5; --accent-2:#9DBEF8; --accent-soft:#122E58; --accent-ink:#C7DBFF;
+    --chip:#0C2350; --bar:rgba(8,21,47,.86);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--page)}
+  body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);letter-spacing:-.01em}
+
+  .bar{position:sticky;top:0;z-index:60;background:var(--bar);backdrop-filter:blur(14px);
+       border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;
+       padding:12px 24px;flex-wrap:wrap}
+  .mark{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;color:#fff;
+        font-weight:800;font-size:14px;letter-spacing:-.03em;background:var(--b600)}
+  :root[data-theme="dark"] .mark{background:var(--accent);color:#08152F}
+  .bar b{font-size:15.5px;font-weight:800;letter-spacing:-.03em}
+  .tag{font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);
+       border:1px solid var(--line);padding:4px 10px;border-radius:99px}
+  .bar em{font-style:normal;font-size:13px;color:var(--ink-3);font-weight:500}
+  .bar nav{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .bar a{font-size:13px;font-weight:600;text-decoration:none;color:var(--ink-2);
+         background:var(--chip);border:1px solid var(--line);padding:7px 13px;border-radius:10px}
+  .bar a:hover{border-color:var(--line-2)}
+  .bar a.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  :root[data-theme="dark"] .bar a.primary{color:#08152F}
+  .bar a.primary:hover{background:var(--accent-2)}
+
+  .modes{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);
+         border-radius:10px;padding:3px}
+  .modes button{border:0;background:none;border-radius:7px;padding:6px 10px;cursor:pointer;
+                font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-3);
+                display:flex;align-items:center;gap:5px;letter-spacing:-.01em}
+  .modes button:hover{color:var(--ink)}
+  .modes button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  :root[data-theme="dark"] .modes button[aria-pressed="true"]{color:#08152F}
+  .modes svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
+             stroke-linecap:round;stroke-linejoin:round}
+
+  #app{min-height:calc(100vh - 56px)}
+
+  :root[data-theme="light"] body, :root[data-theme="light"] .light-mode{
+    --scalar-background-1:#FFFFFF; --scalar-background-2:#F0F3F8; --scalar-background-3:#E5E9F1;
+    --scalar-background-accent:#DDE8FD;
+    --scalar-color-1:#0C1220; --scalar-color-2:#39435A; --scalar-color-3:#6B7488;
+    --scalar-color-accent:#1A56C4; --scalar-border-color:#E5E9F1;
+    --scalar-sidebar-background-1:#F7F9FC;
+    --scalar-sidebar-color-1:#0C1220; --scalar-sidebar-color-2:#6B7488;
+    --scalar-sidebar-border-color:#E5E9F1;
+    --scalar-sidebar-item-hover-background:#EDF2FB; --scalar-sidebar-item-hover-color:#123A85;
+    --scalar-sidebar-item-active-background:#DDE8FD; --scalar-sidebar-color-active:#123A85;
+    --scalar-sidebar-search-background:#FFFFFF; --scalar-sidebar-search-border-color:#E5E9F1;
+    --scalar-sidebar-search-color:#6B7488;
+    --scalar-button-1:#1A56C4; --scalar-button-1-color:#FFFFFF; --scalar-button-1-hover:#2F6FE4;
+    --scalar-color-green:#1D7A55; --scalar-color-red:#C8452E;
+    --scalar-color-blue:#1A56C4;  --scalar-color-orange:#B0740F; --scalar-color-purple:#5B3FBF;
+  }
+  :root[data-theme="dark"] body, :root[data-theme="dark"] .dark-mode{
+    --scalar-background-1:#08152F; --scalar-background-2:#0C2350; --scalar-background-3:#123055;
+    --scalar-background-accent:#122E58;
+    --scalar-color-1:#EAF1FE; --scalar-color-2:#A9BEE4; --scalar-color-3:#7C93BC;
+    --scalar-color-accent:#7FA8F5; --scalar-border-color:#17325C;
+    --scalar-sidebar-background-1:#06101F;
+    --scalar-sidebar-color-1:#EAF1FE; --scalar-sidebar-color-2:#7C93BC;
+    --scalar-sidebar-border-color:#17325C;
+    --scalar-sidebar-item-hover-background:#0F2647; --scalar-sidebar-item-hover-color:#C7DBFF;
+    --scalar-sidebar-item-active-background:#122E58; --scalar-sidebar-color-active:#C7DBFF;
+    --scalar-sidebar-search-background:#0C2350; --scalar-sidebar-search-border-color:#17325C;
+    --scalar-sidebar-search-color:#7C93BC;
+    --scalar-button-1:#7FA8F5; --scalar-button-1-color:#08152F; --scalar-button-1-hover:#9DBEF8;
+    --scalar-color-green:#5FD3A0; --scalar-color-red:#FF9C8A;
+    --scalar-color-blue:#7FA8F5;  --scalar-color-orange:#F2B45C; --scalar-color-purple:#B69CFF;
+  }
+  body{--scalar-font:'Plus Jakarta Sans',system-ui,sans-serif;
+       --scalar-font-code:'JetBrains Mono',ui-monospace,monospace}
+</style>
+</head>
+<body>
+  <header class="bar">
+    <span class="mark">B</span>
+    <b>BrainXP</b>
+    <span class="tag" id="ver">API</span>
+    <em>Generated from source on every deploy</em>
+    <nav>
+      <div class="modes" role="group" aria-label="Colour theme">
+        <button data-mode="light" title="Light">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg>
+          Light
+        </button>
+        <button data-mode="dark" title="Dark">
+          <svg viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></svg>
+          Dark
+        </button>
+        <button data-mode="system" title="Follow system">
+          <svg viewBox="0 0 24 24"><rect x="2.8" y="4.2" width="18.4" height="12.4" rx="2"/><path d="M8.5 20.2h7M12 16.6v3.6"/></svg>
+          System
+        </button>
+      </div>
+      <a href="/openapi.json">openapi.json</a>
+      <a href="/API.md">API.md</a>
+      <a class="primary" href="https://brainxp-api.satu-miliar-pertama-di-2027.biz.id/health">Service health</a>
+    </nav>
+  </header>
+
+  <div id="app"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  <script>
+    var query = window.matchMedia('(prefers-color-scheme: dark)')
+
+    function resolve(mode) {
+      return mode === 'dark' || (mode === 'system' && query.matches)
+    }
+
+    function paint(mode) {
+      var dark = resolve(mode)
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      document.documentElement.dataset.mode = mode
+      ;[document.body, document.getElementById('app')].forEach(function (el) {
+        if (!el) return
+        el.classList.toggle('dark-mode', dark)
+        el.classList.toggle('light-mode', !dark)
+      })
+      document.querySelectorAll('.modes button').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.mode === mode))
+      })
+    }
+
+    function current() {
+      try {
+        var v = localStorage.getItem('brainxp.spec.theme')
+        return v === 'light' || v === 'dark' ? v : 'system'
+      } catch (e) { return 'system' }
+    }
+
+    document.querySelectorAll('.modes button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var mode = b.dataset.mode
+        try { localStorage.setItem('brainxp.spec.theme', mode) } catch (e) {}
+        paint(mode)
+      })
+    })
+
+    query.addEventListener('change', function () {
+      if (current() === 'system') paint('system')
+    })
+
+    Scalar.createApiReference('#app', {
+      url: '/openapi.json',
+      theme: 'default',
+      darkMode: resolve(current()),
+      hideDarkModeToggle: true,
+      withDefaultFonts: false,
+      modelsSectionLabel: 'Schemas',
+      metaData: {
+        title: 'BrainXP API',
+        description: 'Play time is minted by studying, not bought.'
+      },
+      servers: [
+        { url: 'https://brainxp-api.satu-miliar-pertama-di-2027.biz.id',
+          description: 'Development server' }
+      ]
+    })
+
+    paint(current())
+    new MutationObserver(function () { paint(current()) })
+      .observe(document.getElementById('app'), { childList: true })
+
+    fetch('/version.json')
+      .then(function (r) { return r.json() })
+      .then(function (v) {
+        document.getElementById('ver').textContent = 'v' + v.version + ' · ' + v.paths + ' paths'
+      })
+      .catch(function () {})
+  </script>
+</body>
+</html>
