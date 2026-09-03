@@ -3,14 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy import select
 
 from app import schemas as S
 from app import tables as T
 from app.config import settings
 from app.deps import Conn, Me
-from app.errors import Conflict, Unauthorized
+from app.errors import Conflict, RateLimited, Unauthorized
 from app.security import (
     hash_password,
     issue_access_token,
@@ -21,6 +21,7 @@ from app.security import (
     verify_password,
 )
 from app.services import progress as P
+from app.services import ratelimit as RL
 
 router = APIRouter(tags=["auth"])
 
@@ -112,7 +113,11 @@ async def register(body: S.RegisterIn, db: Conn):
 
 
 @router.post("/auth/login", response_model=S.TokenOut)
-async def login(body: S.LoginIn, db: Conn):
+async def login(body: S.LoginIn, db: Conn, request: Request):
+    ip = RL.client_ip(dict(request.headers), request.client.host if request.client else None)
+    if not await RL.hit(f"login:ip:{ip}", RL.LOGIN_PER_IP):
+        raise RateLimited("Terlalu banyak percobaan masuk. Coba lagi nanti.")
+
     row = (
         await db.execute(select(T.users).where(T.users.c.email == body.email.lower()))
     ).mappings().first()

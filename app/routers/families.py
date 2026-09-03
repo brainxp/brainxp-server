@@ -3,15 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy import select
 
 from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject
-from app.errors import Conflict, Forbidden, Invalid, NotFound
+from app.errors import Conflict, Forbidden, NotFound, RateLimited
 from app.security import (
-    constant_time_equals,
     issue_access_token,
     new_device_secret,
     new_opaque_token,
@@ -21,6 +20,7 @@ from app.security import (
 )
 from app.services import ledger as L
 from app.services import progress as P
+from app.services import ratelimit as RL
 
 router = APIRouter(tags=["family"])
 
@@ -158,7 +158,13 @@ async def check_binding(body: S.BindingCheckIn, db: Conn):
 
 
 @router.post("/devices/pair", response_model=S.TokenOut)
-async def pair_device(body: S.PairIn, db: Conn):
+async def pair_device(body: S.PairIn, db: Conn, request: Request):
+    ip = RL.client_ip(dict(request.headers), request.client.host if request.client else None)
+    within_ip = await RL.hit(f"pair:ip:{ip}", RL.PAIR_PER_IP)
+    within_all = await RL.hit("pair:global", RL.PAIR_GLOBAL)
+    if not (within_ip and within_all):
+        raise RateLimited("Terlalu banyak percobaan pairing. Coba lagi nanti.")
+
     row = (
         await db.execute(
             select(T.pairing_codes).where(T.pairing_codes.c.code == body.code)
@@ -171,14 +177,11 @@ async def pair_device(body: S.PairIn, db: Conn):
         raise Conflict("Kode ini sudah dipakai.", code="code_used")
     if row["expires_at"] <= now():
         raise Conflict("Kode sudah kedaluwarsa. Minta yang baru.", code="code_expired")
-    if row["attempt_count"] >= PAIRING_MAX_ATTEMPTS:
-        raise Conflict("Percobaan sudah habis. Minta kode baru.", code="code_locked")
-    if not constant_time_equals(row["code"], body.code):
-        await db.execute(
-            T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])
-            .values(attempt_count=T.pairing_codes.c.attempt_count + 1)
-        )
-        raise Invalid("Kode tidak cocok.", code="code_mismatch")
+
+    await db.execute(
+        T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])
+        .values(attempt_count=T.pairing_codes.c.attempt_count + 1)
+    )
 
     secret_raw, secret_hash = new_device_secret()
     device_id = (
