@@ -57,3 +57,16 @@ def test_seluruh_endpoint_kuis_membutuhkan_otorisasi(spec):
 
 def test_semua_endpoint_terdaftar(spec):
     assert len(spec["paths"]) >= 30
+
+
+def test_unggah_materi_mengantrekan_pekerjaan_setelah_transaksi_selesai():
+    import inspect
+
+    from app.routers import materials
+
+    source = inspect.getsource(materials.upload_material)
+    assert "tasks.add_task(Q.enqueue" in source, (
+        "pekerjaan generate harus diantrekan lewat BackgroundTasks; kalau dipanggil "
+        "langsung, worker bisa membacanya sebelum baris materi ter-commit"
+    )
+    assert "await Q.enqueue(" not in source

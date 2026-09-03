@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
@@ -39,6 +39,7 @@ async def upload_material(
     subject_id: uuid.UUID,
     db: Conn,
     me: Me,
+    tasks: BackgroundTasks,
     file: UploadFile = File(...),
     method: str = Form("document"),
 ):
@@ -95,7 +96,7 @@ async def upload_material(
             declared_level=pol["academic_level"],
         )
     )
-    await Q.enqueue("generate", material_id=str(material_id))
+    tasks.add_task(Q.enqueue, "generate", material_id=str(material_id))
     return S.MaterialAcceptedOut(material_id=material_id, status="uploaded")
 
 
