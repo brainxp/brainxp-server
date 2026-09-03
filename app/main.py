@@ -43,6 +43,21 @@ api = FastAPI(
     redoc_url=None,
 )
 
+@api.middleware("http")
+async def security_headers(request: Request, call_next):
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception("galat tak tertangani pada %s %s", request.method, request.url.path)
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": {"code": "internal", "message": "Terjadi galat di server."}},
+        )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
 if settings().origins:
     api.add_middleware(
         CORSMiddleware,
@@ -50,23 +65,6 @@ if settings().origins:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-    )
-
-
-@api.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Referrer-Policy"] = "no-referrer"
-    return response
-
-
-@api.exception_handler(Exception)
-async def unhandled(request: Request, exc: Exception):
-    log.exception("galat tak tertangani pada %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": {"code": "internal", "message": "Terjadi galat di server."}},
     )
 
 
