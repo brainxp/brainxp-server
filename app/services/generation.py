@@ -1,0 +1,283 @@
+from __future__ import annotations
+
+import json
+import logging
+import uuid
+from dataclasses import asdict
+from difflib import SequenceMatcher
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncConnection
+
+from app import queue as Q
+from app import tables as T
+from app.services import documents, storage
+from app.services import rules as R
+from app.services.llm import PROMPT_VERSION, Attachment, GeneratedQuestion, provider
+
+log = logging.getLogger("brainxp.generation")
+
+CHANNEL = "brainxp:material:{}"
+
+
+async def publish(material_id: uuid.UUID, payload: dict) -> None:
+    await Q.redis().publish(CHANNEL.format(material_id), json.dumps(payload))
+    await Q.redis().setex(f"brainxp:material:last:{material_id}", 3600, json.dumps(payload))
+
+
+async def times_studied(db: AsyncConnection, subject_id: uuid.UUID, content_hash: str) -> int:
+    n = (
+        await db.execute(
+            select(func.count())
+            .select_from(T.quiz_sessions)
+            .join(T.question_sets, T.question_sets.c.id == T.quiz_sessions.c.question_set_id)
+            .join(T.materials, T.materials.c.id == T.question_sets.c.material_id)
+            .where(
+                T.quiz_sessions.c.subject_id == subject_id,
+                T.quiz_sessions.c.status == "submitted",
+                T.materials.c.content_sha256 == content_hash,
+            )
+        )
+    ).scalar_one()
+    return int(n)
+
+
+async def near_duplicate_penalty(
+    db: AsyncConnection, subject_id: uuid.UUID, topic: str, exclude: uuid.UUID
+) -> int:
+    if not topic:
+        return 0
+    rows = (
+        await db.execute(
+            select(T.materials.c.topic_summary)
+            .where(
+                T.materials.c.subject_id == subject_id,
+                T.materials.c.id != exclude,
+                T.materials.c.deleted_at.is_(None),
+                T.materials.c.topic_summary.isnot(None),
+            )
+            .order_by(T.materials.c.created_at.desc())
+            .limit(40)
+        )
+    ).all()
+    hits = sum(
+        1 for (prev,) in rows
+        if SequenceMatcher(None, topic.lower(), (prev or "").lower()).ratio() >= 0.82
+    )
+    return hits
+
+
+def _rows_for(qs_id: uuid.UUID, items: list[GeneratedQuestion], start: int, batch: int) -> list[dict]:
+    out = []
+    for i, q in enumerate(items):
+        out.append({
+            "question_set_id": qs_id,
+            "batch_index": batch,
+            "ordinal": start + i,
+            "qtype": q.qtype,
+            "stem": q.stem,
+            "options": q.options,
+            "correct_index": q.correct_index,
+            "rubric": [c.model_dump() for c in q.rubric] if q.rubric else None,
+            "reference_answer": q.reference_answer,
+            "source_excerpt": q.source_excerpt,
+            "explanation": q.explanation,
+            "difficulty": q.difficulty,
+            "bloom_level": q.bloom_level,
+        })
+    return out
+
+
+def _valid(q: GeneratedQuestion) -> bool:
+    if not q.stem.strip() or not q.source_excerpt.strip() or len(q.stem) > 600:
+        return False
+    if q.qtype == "mcq":
+        if not q.options or len(q.options) != 4:
+            return False
+        if q.correct_index is None or not 0 <= q.correct_index < 4:
+            return False
+        cleaned = [o.strip().lower() for o in q.options]
+        if len(set(cleaned)) != 4 or any(not o for o in cleaned):
+            return False
+        banned = ("semua benar", "tidak ada yang benar", "all of the above", "none of the above")
+        return not any(any(b in o for b in banned) for o in cleaned)
+    if not q.rubric or not 2 <= len(q.rubric) <= 5:
+        return False
+    return bool(q.reference_answer and q.reference_answer.strip())
+
+
+def _dedupe(items: list[GeneratedQuestion]) -> list[GeneratedQuestion]:
+    kept: list[GeneratedQuestion] = []
+    for q in items:
+        if all(SequenceMatcher(None, q.stem.lower(), k.stem.lower()).ratio() < 0.85 for k in kept):
+            kept.append(q)
+    return kept
+
+
+async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
+    mat = (
+        await db.execute(select(T.materials).where(T.materials.c.id == material_id))
+    ).mappings().one()
+    pol = (
+        await db.execute(select(T.policies).where(T.policies.c.subject_id == mat["subject_id"]))
+    ).mappings().one()
+
+    async def fail(reason: str) -> None:
+        await db.execute(
+            T.materials.update().where(T.materials.c.id == material_id)
+            .values(status="failed", gate_reason=reason)
+        )
+        await publish(material_id, {"stage": "failed", "reason": reason})
+
+    await publish(material_id, {"stage": "reading", "ready": 0})
+    try:
+        raw = await storage.get(mat["storage_key"])
+        data, media = await documents.to_attachment_bytes(
+            data=raw, media_type=mat["source_type"]
+        )
+    except Exception as exc:
+        log.exception("normalisasi gagal untuk %s", material_id)
+        return await fail(f"Berkas tidak dapat dibaca: {exc}")
+
+    att = Attachment(media_type=media, data=data)
+    llm = provider()
+
+    await db.execute(
+        T.materials.update().where(T.materials.c.id == material_id).values(status="validating")
+    )
+    await publish(material_id, {"stage": "validating", "ready": 0})
+
+    try:
+        verdict = await llm.validate_material(att=att, declared_level=pol["academic_level"])
+    except Exception as exc:
+        log.exception("validasi gagal untuk %s", material_id)
+        return await fail(f"Materi tidak dapat diperiksa: {exc}")
+
+    seen = await times_studied(db, mat["subject_id"], mat["content_sha256"])
+    seen += await near_duplicate_penalty(
+        db, mat["subject_id"], verdict.topic_summary, material_id
+    )
+
+    gate = R.evaluate_gate(
+        declared_level=pol["academic_level"],
+        assessed_level=verdict.assessed_level,
+        concept_density=verdict.concept_density,
+        is_study_material=verdict.is_study_material,
+        times_seen=seen,
+    )
+
+    await db.execute(
+        T.materials.update().where(T.materials.c.id == material_id).values(
+            assessed_level=verdict.assessed_level,
+            concept_density=round(verdict.concept_density, 3),
+            detected_language=verdict.detected_language,
+            topic_summary=verdict.topic_summary,
+            novelty_score=gate.novelty_factor,
+            gate_verdict="accepted" if gate.accepted else "rejected",
+            gate_reason=gate.reject_reason or gate.note or None,
+            status="generating" if gate.accepted else "rejected",
+        )
+    )
+
+    if not gate.accepted:
+        if mat["storage_key"]:
+            await storage.delete(mat["storage_key"])
+            await db.execute(
+                T.materials.update().where(T.materials.c.id == material_id)
+                .values(storage_key=None, purged_at=func.now())
+            )
+        await publish(material_id, {
+            "stage": "rejected",
+            "reason": gate.reject_reason,
+            "note": gate.note,
+            "assessed_level": verdict.assessed_level,
+            "declared_level": pol["academic_level"],
+        })
+        return
+
+    want = int(pol["questions_per_session"])
+    _, essays = R.session_mix(want, float(pol["essay_ratio"]))
+    first = R.priority_batch_size(want)
+    first_essays = 1 if essays and first >= 3 else 0
+
+    qs_id = (
+        await db.execute(
+            T.question_sets.insert().values(
+                material_id=material_id,
+                model_id=(getattr(llm, "_s", None) and llm._s.model_generation) or "stub",
+                prompt_version=PROMPT_VERSION,
+                requested_count=want,
+                status="partial",
+            ).returning(T.question_sets.c.id)
+        )
+    ).scalar_one()
+
+    async def make(count: int, ess: int, batch: int, start: int, avoid: list[str]) -> list[str]:
+        result = await llm.generate_questions(
+            att=att, count=count, essays=ess,
+            academic_level=pol["academic_level"],
+            language=pol["question_language"],
+            avoid=avoid,
+        )
+        good = _dedupe([q for q in result.questions if _valid(q)])
+        if not good:
+            return []
+        rows = _rows_for(qs_id, good, start, batch)
+        await db.execute(T.questions.insert(), rows)
+        await db.execute(
+            T.question_sets.update().where(T.question_sets.c.id == qs_id)
+            .values(ready_count=T.question_sets.c.ready_count + len(good))
+        )
+        return [q.stem for q in good]
+
+    try:
+        stems = await make(first, first_essays, 0, 0, [])
+    except Exception as exc:
+        log.exception("batch prioritas gagal untuk %s", material_id)
+        return await fail(f"Soal tidak dapat dibuat: {exc}")
+
+    if not stems:
+        return await fail("Tidak ada soal yang lolos validasi dari materi ini.")
+
+    await publish(material_id, {"stage": "partial", "ready": len(stems),
+                                "question_set_id": str(qs_id), "total": want})
+
+    rest = want - len(stems)
+    rest_essays = max(0, essays - first_essays)
+    produced = list(stems)
+    if rest > 0:
+        try:
+            produced += await make(rest, min(rest_essays, rest), 1, len(stems), stems)
+        except Exception:
+            log.exception("batch lanjutan gagal untuk %s", material_id)
+
+    blooms = [
+        r[0] for r in (
+            await db.execute(
+                select(T.questions.c.bloom_level)
+                .where(T.questions.c.question_set_id == qs_id)
+            )
+        ).all()
+    ]
+    floor_ok = R.bloom_floor_met(blooms, pol["academic_level"])
+
+    ready = len(produced)
+    status = "complete" if ready >= want else "degraded"
+    await db.execute(
+        T.question_sets.update().where(T.question_sets.c.id == qs_id).values(status=status)
+    )
+    await db.execute(
+        T.materials.update().where(T.materials.c.id == material_id).values(status="ready")
+    )
+
+    await publish(material_id, {
+        "stage": "ready",
+        "ready": ready,
+        "total": want,
+        "status": status,
+        "question_set_id": str(qs_id),
+        "bloom_floor_met": floor_ok,
+        "level_factor": gate.level_factor,
+        "novelty_factor": gate.novelty_factor,
+        "gate": asdict(gate),
+    })

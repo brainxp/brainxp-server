@@ -1,0 +1,59 @@
+import pytest
+
+from app.main import api
+
+SECRETS = {"correct_index", "rubric", "reference_answer"}
+
+ALLOWED = {"AnswerFeedbackOut"}
+
+
+@pytest.fixture(scope="module")
+def spec():
+    return api.openapi()
+
+
+def test_skema_soal_publik_tidak_punya_tempat_untuk_kunci_jawaban(spec):
+    props = set(spec["components"]["schemas"]["QuestionPublic"]["properties"])
+    assert not (props & SECRETS), f"QuestionPublic membocorkan {props & SECRETS}"
+
+
+def test_bank_luring_hanya_mengirim_hmac(spec):
+    props = set(spec["components"]["schemas"]["OfflineQuestionOut"]["properties"])
+    assert not (props & SECRETS)
+    assert "answer_hmac" in props
+
+
+def test_tidak_ada_skema_lain_yang_membocorkan_kunci_jawaban(spec):
+    leaks = {
+        name: set(s.get("properties", {})) & SECRETS
+        for name, s in spec["components"]["schemas"].items()
+        if name not in ALLOWED and set(s.get("properties", {})) & SECRETS
+    }
+    assert not leaks, f"skema membocorkan kunci jawaban: {leaks}"
+
+
+def test_rubrik_hanya_dikirim_sebagai_judul_kriteria(spec):
+    props = spec["components"]["schemas"]["QuestionPublic"]["properties"]
+    assert "rubric_criteria" in props
+    assert "rubric" not in props
+
+
+def test_seluruh_endpoint_kuis_membutuhkan_otorisasi(spec):
+    public = {"/health", "/auth/register", "/auth/login", "/auth/refresh",
+              "/devices/pair", "/devices/check-binding"}
+    missing = []
+    for path, ops in spec["paths"].items():
+        if path in public:
+            continue
+        for verb, op in ops.items():
+            has_auth = any(
+                p.get("name", "").lower() == "authorization"
+                for p in op.get("parameters", [])
+            )
+            if not has_auth:
+                missing.append(f"{verb.upper()} {path}")
+    assert not missing, f"endpoint tanpa header identitas: {missing}"
+
+
+def test_semua_endpoint_terdaftar(spec):
+    assert len(spec["paths"]) >= 30

@@ -1,0 +1,47 @@
+[project]
+name = "brainxp-server"
+version = "0.1.0"
+description = "Backend BrainXP — kartu waktu bermain yang dicetak dari materi belajar"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
+  "pydantic[email]>=2.9",
+  "pydantic-settings>=2.6",
+  "python-multipart>=0.0.12",
+  "argon2-cffi>=23.1",
+  "pyjwt>=2.9",
+  "redis>=5.2",
+  "boto3>=1.35",
+  "anthropic>=1.0",
+  "pgvector>=0.3.6",
+  "httpx2>=0.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.7"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/gen_openapi.py" = ["E402"]
