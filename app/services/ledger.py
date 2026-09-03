@@ -102,7 +102,8 @@ async def append(
     )
     if client_event_id:
         stmt = stmt.on_conflict_do_nothing(
-            index_elements=[T.time_ledger.c.subject_id, T.time_ledger.c.client_event_id]
+            index_elements=[T.time_ledger.c.subject_id, T.time_ledger.c.client_event_id],
+            index_where=T.time_ledger.c.client_event_id.isnot(None),
         )
     result = await db.execute(stmt)
     return bool(result.rowcount)
