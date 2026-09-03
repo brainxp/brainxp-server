@@ -177,6 +177,7 @@ class BlockReason:
     NONE = "none"
     NO_BALANCE = "no_balance"
     DAILY_CAP = "daily_cap"
+    GUARDIAN_STALE = "guardian_stale"
 
 
 def block_reason(*, balance: int, daily_cap: int, spent_today: int) -> str:

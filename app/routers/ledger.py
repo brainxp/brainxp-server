@@ -12,6 +12,7 @@ from app.deps import Conn, Me, authorize_subject
 from app.errors import Conflict, Forbidden
 from app.security import now
 from app.services import ledger as L
+from app.services import rules as R
 
 router = APIRouter(tags=["ledger"])
 
@@ -49,7 +50,7 @@ async def standing(subject_id: uuid.UUID, db: Conn, me: Me):
     playable = st.playable
     reason = st.block_reason
     if await _frozen(db, subject_id):
-        playable, reason = 0, "no_balance"
+        playable, reason = 0, R.BlockReason.GUARDIAN_STALE
 
     return S.StandingOut(
         balance_seconds=st.balance, playable_seconds=playable,

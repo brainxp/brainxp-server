@@ -1583,7 +1583,8 @@
             "enum": [
               "none",
               "no_balance",
-              "daily_cap"
+              "daily_cap",
+              "guardian_stale"
             ],
             "title": "Block Reason",
             "type": "string"

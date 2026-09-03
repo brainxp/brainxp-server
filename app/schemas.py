@@ -117,7 +117,7 @@ class StandingOut(BaseModel):
     spent_today_seconds: int
     ceiling_seconds: int
     points: int
-    block_reason: Literal["none", "no_balance", "daily_cap"]
+    block_reason: Literal["none", "no_balance", "daily_cap", "guardian_stale"]
     seconds_until_reset: int
     streak_current: int
     freeze_tokens: int

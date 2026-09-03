@@ -222,3 +222,14 @@ def test_pembagian_soal_mengikuti_porsi_esai():
 def test_batch_prioritas_tidak_melebihi_jumlah_soal():
     assert R.priority_batch_size(10) == 3
     assert R.priority_batch_size(2) == 2
+
+
+def test_alasan_pemblokiran_punya_nilai_khusus_untuk_penjaga_basi():
+    assert R.BlockReason.GUARDIAN_STALE == "guardian_stale"
+    assert R.BlockReason.GUARDIAN_STALE not in (
+        R.BlockReason.NO_BALANCE, R.BlockReason.DAILY_CAP, R.BlockReason.NONE
+    )
+
+
+def test_saldo_utuh_tidak_pernah_dilaporkan_kehabisan_saldo():
+    assert R.block_reason(balance=1740, daily_cap=3600, spent_today=60) == R.BlockReason.NONE
