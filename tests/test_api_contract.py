@@ -70,3 +70,10 @@ def test_unggah_materi_mengantrekan_pekerjaan_setelah_transaksi_selesai():
         "langsung, worker bisa membacanya sebelum baris materi ter-commit"
     )
     assert "await Q.enqueue(" not in source
+
+
+def test_orang_tua_punya_jalur_untuk_mengatur_dirinya_sendiri(spec):
+    path = spec["paths"].get("/subjects/self")
+    assert path, "orang tua harus bisa membuat subjek pribadinya sendiri"
+    schema = path["post"]["responses"]["201"]["content"]["application/json"]["schema"]
+    assert schema["$ref"].endswith("/SubjectOut")

@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 35 operasi pada 31 path.
+Versi 0.1.0. 36 operasi pada 32 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -25,6 +25,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `POST /devices/pair` | — | `PairIn` | 200 `TokenOut` |
 | `GET /subjects` | Bearer | — | 200 `SubjectOut[]` |
 | `POST /subjects` | Bearer | `ChildIn` | 201 `SubjectOut` |
+| `POST /subjects/self` | Bearer | `SelfSubjectIn` | 201 `SubjectOut` |
 | `POST /subjects/{subject_id}/pairing-code` | Bearer | — | 200 `PairingCodeOut` |
 
 ## Aturan
@@ -116,6 +117,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **RegisterIn** — `display_name`, `email`, `mode`?, `password`
 - **ReportOut** — `correct_total`, `days`, `essay_passed`, `guardian_alerts`, `materials_studied`, `recent`, `standing`, `subject`
 - **RetentionIn** — `retention_mode`
+- **SelfSubjectIn** — `academic_level`?, `question_language`?
 - **StandingOut** — `balance_seconds`, `block_reason`, `ceiling_seconds`, `daily_cap_seconds`, `freeze_tokens`, `playable_seconds`, `points`, `seconds_until_reset`, `spent_today_seconds`, `streak_current`
 - **SubjectOut** — `academic_level`, `display_name`, `id`, `kind`
 - **TokenOut** — `access_token`, `device_secret`?, `expires_in`, `family_id`?, `refresh_token`, `role`, `subject_id`?, `user_id`?

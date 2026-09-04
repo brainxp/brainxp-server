@@ -42,6 +42,11 @@ class ChildIn(BaseModel):
     question_language: Literal["id", "en"] = "id"
 
 
+class SelfSubjectIn(BaseModel):
+    academic_level: Level = "profesional"
+    question_language: Literal["id", "en"] = "id"
+
+
 class SubjectOut(BaseModel):
     id: uuid.UUID
     display_name: str

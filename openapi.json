@@ -1573,6 +1573,33 @@
         "title": "RetentionIn",
         "type": "object"
       },
+      "SelfSubjectIn": {
+        "properties": {
+          "academic_level": {
+            "default": "profesional",
+            "enum": [
+              "sd",
+              "smp",
+              "sma",
+              "kuliah",
+              "profesional"
+            ],
+            "title": "Academic Level",
+            "type": "string"
+          },
+          "question_language": {
+            "default": "id",
+            "enum": [
+              "id",
+              "en"
+            ],
+            "title": "Question Language",
+            "type": "string"
+          }
+        },
+        "title": "SelfSubjectIn",
+        "type": "object"
+      },
       "StandingOut": {
         "properties": {
           "balance_seconds": {
@@ -3080,6 +3107,65 @@
           }
         },
         "summary": "Create Child",
+        "tags": [
+          "family"
+        ]
+      }
+    },
+    "/subjects/self": {
+      "post": {
+        "operationId": "create_own_subject_subjects_self_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfSubjectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Own Subject",
         "tags": [
           "family"
         ]

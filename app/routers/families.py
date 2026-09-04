@@ -96,6 +96,54 @@ async def create_child(body: S.ChildIn, db: Conn, me: Me):
     )
 
 
+@router.post("/subjects/self", response_model=S.SubjectOut, status_code=201)
+async def create_own_subject(body: S.SelfSubjectIn, db: Conn, me: Me):
+    if not me.is_parent:
+        raise Forbidden("Hanya orang tua yang dapat menambahkan dirinya sendiri.")
+    fid = await _my_family(db, me)
+
+    mine = (
+        await db.execute(
+            select(T.subjects.c.id).where(
+                T.subjects.c.user_id == me.user_id,
+                T.subjects.c.kind == "personal",
+                T.subjects.c.deleted_at.is_(None),
+            )
+        )
+    ).first()
+    if mine:
+        raise Conflict("Aturan untuk diri sendiri sudah aktif.", code="self_subject_exists")
+
+    owner = (
+        await db.execute(select(T.users.c.display_name).where(T.users.c.id == me.user_id))
+    ).scalar_one()
+
+    sid = (
+        await db.execute(
+            T.subjects.insert().values(
+                family_id=fid, user_id=me.user_id, display_name=owner,
+                academic_level=body.academic_level, kind="personal",
+            ).returning(T.subjects.c.id)
+        )
+    ).scalar_one()
+    await db.execute(
+        T.policies.insert().values(
+            subject_id=sid, academic_level=body.academic_level,
+            question_language=body.question_language,
+            allowed_upload_methods=["photo", "document"], updated_by=me.user_id,
+        )
+    )
+    await P.ensure_row(db, sid)
+    await db.execute(
+        T.audit_log.insert().values(
+            actor_user_id=me.user_id, action="create_self_subject", target=str(sid)
+        )
+    )
+    return S.SubjectOut(
+        id=sid, display_name=owner, academic_level=body.academic_level, kind="personal",
+    )
+
+
 @router.post("/subjects/{subject_id}/pairing-code", response_model=S.PairingCodeOut)
 async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
     if not me.is_parent:
