@@ -52,4 +52,12 @@ def test_batas_panjang_menolak_soal_yang_kepanjangan():
     assert _within_limits(wajar)
 
     kepanjangan = wajar.model_copy(update={"explanation": "x" * (L.EXPLANATION_MAX + 1)})
-    assert not _within_limits(kepanjangan)
+    assert not _within_limits(kepanjangan), (
+        "soal yang kepanjangan harus dibuang satu per satu, bukan membatalkan seluruh batch"
+    )
+
+    rubrik_panjang = wajar.model_copy(update={
+        "rubric": [L.RubricCriterion(criterion="y" * (L.CRITERION_MAX + 1),
+                                     weight=0.5, indicator="z")],
+    })
+    assert not _within_limits(rubrik_panjang)

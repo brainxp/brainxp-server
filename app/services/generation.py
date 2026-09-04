@@ -97,6 +97,10 @@ def _within_limits(q: GeneratedQuestion) -> bool:
         and len(q.explanation) <= L.EXPLANATION_MAX
         and len(q.reference_answer or "") <= L.REFERENCE_MAX
         and all(len(o) <= L.OPTION_MAX for o in (q.options or []))
+        and all(
+            len(c.criterion) <= L.CRITERION_MAX and len(c.indicator) <= L.INDICATOR_MAX
+            for c in (q.rubric or [])
+        )
     )
 
 

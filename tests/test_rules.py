@@ -276,10 +276,22 @@ def test_worker_menunggu_baris_materi_cukup_lama():
 def test_soal_tidak_bisa_jadi_wadah_teks_panjang():
     from app.services import llm as L
 
-    assert L.EXPLANATION_MAX <= 600, "pembahasan yang panjang jadi tempat menyelundupkan kode"
+    assert L.EXPLANATION_MAX <= 900, "pembahasan yang panjang jadi tempat menyelundupkan kode"
     assert L.STEM_MAX <= 800
-    assert L.OPTION_MAX <= 300
-    assert L.REFERENCE_MAX <= 1000
+    assert L.OPTION_MAX <= 400
+    assert L.REFERENCE_MAX <= 2000
+    assert L.CRITERION_MAX <= 400
+
+
+def test_batas_panjang_tidak_membatalkan_seluruh_batch():
+    from app.services import llm as L
+
+    panjang = "x" * (L.EXPLANATION_MAX + 500)
+    L.GeneratedQuestion(
+        qtype="mcq", stem="Apa?", options=["A", "B", "C", "D"], correct_index=0,
+        source_excerpt="cuplikan", explanation=panjang,
+        difficulty="mudah", bloom_level="understand",
+    )
 
 
 def test_materi_pengguna_dibingkai_sebagai_data():

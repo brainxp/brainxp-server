@@ -28,27 +28,29 @@ class GateVerdict(BaseModel):
 
 
 class RubricCriterion(BaseModel):
-    criterion: str = Field(max_length=160)
+    criterion: str
     weight: float = Field(gt=0, le=1)
-    indicator: str = Field(max_length=80)
+    indicator: str
 
 
 STEM_MAX = 600
-OPTION_MAX = 220
-EXCERPT_MAX = 400
-EXPLANATION_MAX = 500
-REFERENCE_MAX = 800
+OPTION_MAX = 300
+EXCERPT_MAX = 500
+EXPLANATION_MAX = 700
+REFERENCE_MAX = 1500
+CRITERION_MAX = 250
+INDICATOR_MAX = 120
 
 
 class GeneratedQuestion(BaseModel):
     qtype: Literal["mcq", "essay"]
-    stem: str = Field(max_length=STEM_MAX)
-    options: list[str] | None = Field(default=None, max_length=4)
+    stem: str
+    options: list[str] | None = None
     correct_index: int | None = None
-    rubric: list[RubricCriterion] | None = Field(default=None, max_length=5)
-    reference_answer: str | None = Field(default=None, max_length=REFERENCE_MAX)
-    source_excerpt: str = Field(max_length=EXCERPT_MAX)
-    explanation: str = Field(max_length=EXPLANATION_MAX)
+    rubric: list[RubricCriterion] | None = None
+    reference_answer: str | None = None
+    source_excerpt: str
+    explanation: str
     difficulty: Difficulty
     bloom_level: Bloom
 
@@ -160,7 +162,10 @@ Aturan yang tidak boleh dilanggar:
 5. Untuk materi matematika dan sains, arahkan soal pada pemahaman konseptual:
    penafsiran rumus, pemilihan metode, menemukan kesalahan pada langkah
    pengerjaan, atau menalar hasil. Hindari perhitungan aritmetika panjang.
-6. Tulis seluruh soal dalam bahasa yang diminta, apa pun bahasa materinya."""
+6. Tulis seluruh soal dalam bahasa yang diminta, apa pun bahasa materinya.
+7. Ringkas. Pertanyaan paling banyak 600 karakter, pembahasan 700, jawaban
+   acuan 1500, tiap opsi 300, tiap kriteria rubrik 250. Soal yang melebihi
+   batas ini dibuang, jadi tulis padat sejak awal."""
 
 GRADE_SYSTEM = """\
 Kamu menilai satu jawaban esai terhadap rubrik yang sudah ditetapkan sebelum
