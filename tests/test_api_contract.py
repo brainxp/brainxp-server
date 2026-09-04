@@ -103,3 +103,10 @@ def test_orang_tua_bukan_perantara_untuk_subjeknya_sendiri():
     )
     child = SimpleNamespace(is_parent=False, user_id=None)
     assert not is_proxy(child, {"user_id": None})
+
+
+def test_soal_per_sesi_dibatasi_sepuluh(spec):
+    field = spec["components"]["schemas"]["PolicyIn"]["properties"]["questions_per_session"]
+    bounds = next(v for v in field["anyOf"] if v.get("type") == "integer")
+    assert bounds["maximum"] == 10, "batas yang ditampilkan di layar harus dijaga API juga"
+    assert bounds["minimum"] == 1

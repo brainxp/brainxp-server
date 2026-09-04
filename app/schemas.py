@@ -96,7 +96,7 @@ class PolicyOut(BaseModel):
 
 
 class PolicyIn(BaseModel):
-    questions_per_session: int | None = Field(default=None, ge=1, le=50)
+    questions_per_session: int | None = Field(default=None, ge=1, le=10)
     base_reward_seconds: int | None = Field(default=None, ge=15, le=1800)
     essay_ratio: float | None = Field(default=None, ge=0, le=1)
     academic_level: Level | None = None

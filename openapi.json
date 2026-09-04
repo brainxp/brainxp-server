@@ -875,7 +875,7 @@
           "questions_per_session": {
             "anyOf": [
               {
-                "maximum": 50.0,
+                "maximum": 10.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
