@@ -4,12 +4,13 @@ import random
 import uuid
 
 from fastapi import APIRouter
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject
-from app.errors import Conflict, Forbidden, NotFound
+from app.errors import Conflict, Forbidden, Invalid, NotFound
 from app.security import now
 from app.services import grading
 from app.services import ledger as L
@@ -66,6 +67,18 @@ async def start_quiz(subject_id: uuid.UUID, body: S.QuizStartIn, db: Conn, me: M
     ).mappings().first()
     if not qs or qs["ready_count"] == 0:
         raise Conflict("Belum ada soal yang siap.", code="not_ready")
+
+    open_session = (
+        await db.execute(
+            select(T.quiz_sessions.c.id).where(
+                T.quiz_sessions.c.subject_id == subject_id,
+                T.quiz_sessions.c.question_set_id == qs["id"],
+                T.quiz_sessions.c.status == "open",
+            ).order_by(T.quiz_sessions.c.started_at.desc()).limit(1)
+        )
+    ).scalar()
+    if open_session:
+        return await get_quiz(open_session, db, me)
 
     pol = (
         await db.execute(select(T.policies).where(T.policies.c.subject_id == subject_id))
@@ -169,11 +182,19 @@ async def get_quiz(session_id: uuid.UUID, db: Conn, me: Me):
         )),
         ready_count=qs["ready_count"], total_count=qs["requested_count"],
         status=qs["status"],
+        answered_ids=[
+            r[0] for r in (
+                await db.execute(
+                    select(T.quiz_answers.c.question_id)
+                    .where(T.quiz_answers.c.session_id == session_id)
+                )
+            ).all()
+        ],
         questions=[_public(rows[q], perms.get(q, [])) for q in order if q in rows],
     )
 
 
-@router.post("/quizzes/{session_id}/answers", response_model=S.AnswerFeedbackOut)
+@router.post("/quizzes/{session_id}/answers", response_model=S.AnswerSavedOut)
 async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
     ses = await _load(db, session_id)
     await authorize_subject(db, me, ses["subject_id"])
@@ -188,67 +209,34 @@ async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
     if not q or q["question_set_id"] != ses["question_set_id"]:
         raise NotFound("Soal tidak ada di sesi ini.")
 
-    existing = (
-        await db.execute(
-            select(T.quiz_answers.c.question_id).where(
-                T.quiz_answers.c.session_id == session_id,
-                T.quiz_answers.c.question_id == body.question_id,
-            )
-        )
-    ).first()
-    if existing:
-        raise Conflict("Soal ini sudah dijawab.", code="already_answered")
+    if q["qtype"] == "mcq" and body.chosen_index is None:
+        raise Invalid("Pilih salah satu jawaban dulu.")
+    if q["qtype"] == "essay" and not (body.essay_text or "").strip():
+        raise Invalid("Tulis jawabanmu dulu.")
 
-    lf = float(ses["level_factor"])
-    nf = float(ses["novelty_factor"])
-    base = ses["base_reward_seconds"]
-
-    if q["qtype"] == "mcq":
-        perm = list(ses["option_permutation"].get(str(q["id"]), []))
-        real = perm[body.chosen_index] if (body.chosen_index is not None and perm) else None
-        ok = grading.grade_mcq(chosen_index=real, correct_index=q["correct_index"])
-        reward = R.question_reward(
-            base_seconds=base, difficulty=q["difficulty"], qtype="mcq",
-            level_factor_=lf, novelty_factor_=nf, correct=ok,
-        )
-        shown_correct = perm.index(q["correct_index"]) if perm else q["correct_index"]
-        await db.execute(
-            T.quiz_answers.insert().values(
-                session_id=session_id, question_id=q["id"], chosen_index=body.chosen_index,
-                is_correct=ok, reward_seconds=reward,
-            )
-        )
-        return S.AnswerFeedbackOut(
-            question_id=q["id"], qtype="mcq", is_correct=ok, correct_index=shown_correct,
-            reward_seconds=round(reward, 2), explanation=q["explanation"],
-        )
-
-    result = await grading.grade_essay(
-        stem=q["stem"], rubric=list(q["rubric"] or []),
-        reference_answer=q["reference_answer"] or "", answer=body.essay_text or "",
-    )
-    reward = R.question_reward(
-        base_seconds=base, difficulty=q["difficulty"], qtype="essay",
-        level_factor_=lf, novelty_factor_=nf, score=result.rewardable_score,
-    )
+    values = {
+        "session_id": session_id,
+        "question_id": q["id"],
+        "chosen_index": body.chosen_index,
+        "essay_text": body.essay_text,
+        "answered_at": now(),
+    }
     await db.execute(
-        T.quiz_answers.insert().values(
-            session_id=session_id, question_id=q["id"], essay_text=body.essay_text,
-            score=result.score, is_correct=result.passed, reward_seconds=reward,
-            evaluator_notes=result.notes, injection_flag=result.injection_flag,
+        pg_insert(T.quiz_answers).values(**values).on_conflict_do_update(
+            index_elements=[T.quiz_answers.c.session_id, T.quiz_answers.c.question_id],
+            set_={k: values[k] for k in ("chosen_index", "essay_text", "answered_at")},
         )
     )
-    if result.injection_flag:
+
+    answered = (
         await db.execute(
-            T.guardian_events.insert().values(
-                subject_id=ses["subject_id"], event_type="essay_injection_attempt",
-                payload={"session_id": str(session_id), "question_id": str(q["id"])},
-            )
+            select(func.count()).select_from(T.quiz_answers)
+            .where(T.quiz_answers.c.session_id == session_id)
         )
-    return S.AnswerFeedbackOut(
-        question_id=q["id"], qtype="essay", is_correct=result.passed, score=result.score,
-        injection_flag=result.injection_flag, reward_seconds=round(reward, 2),
-        explanation=q["explanation"], notes=result.notes,
+    ).scalar_one()
+    return S.AnswerSavedOut(
+        question_id=q["id"], answered_count=int(answered),
+        total_count=len(list(ses["question_order"])),
     )
 
 
@@ -285,31 +273,81 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
         ).mappings().all()
     }
 
+    order = list(ses["question_order"])
+    missing = [qid for qid in order if qid in questions and qid not in answers]
+    if missing:
+        raise Conflict(
+            f"Masih ada {len(missing)} soal yang belum dijawab.", code="incomplete_session"
+        )
+
+    lf, nf = float(ses["level_factor"]), float(ses["novelty_factor"])
+    base = ses["base_reward_seconds"]
+    marks: dict[str, dict] = {}
+
+    for qid in order:
+        q = questions.get(qid)
+        if not q:
+            continue
+        a = answers[qid]
+        if q["qtype"] == "mcq":
+            perm = list(ses["option_permutation"].get(qid, []))
+            picked = a["chosen_index"]
+            real = perm[picked] if (picked is not None and perm) else picked
+            ok = grading.grade_mcq(chosen_index=real, correct_index=q["correct_index"])
+            mark = {
+                "is_correct": ok, "score": None, "evaluator_notes": None,
+                "injection_flag": False,
+                "reward_seconds": R.question_reward(
+                    base_seconds=base, difficulty=q["difficulty"], qtype="mcq",
+                    level_factor_=lf, novelty_factor_=nf, correct=ok,
+                ),
+            }
+        else:
+            verdict = await grading.grade_essay(
+                stem=q["stem"], rubric=list(q["rubric"] or []),
+                reference_answer=q["reference_answer"] or "", answer=a["essay_text"] or "",
+            )
+            mark = {
+                "is_correct": verdict.passed, "score": verdict.score,
+                "evaluator_notes": verdict.notes, "injection_flag": verdict.injection_flag,
+                "reward_seconds": R.question_reward(
+                    base_seconds=base, difficulty=q["difficulty"], qtype="essay",
+                    level_factor_=lf, novelty_factor_=nf, score=verdict.rewardable_score,
+                ),
+            }
+            if verdict.injection_flag:
+                await db.execute(
+                    T.guardian_events.insert().values(
+                        subject_id=ses["subject_id"], event_type="essay_injection_attempt",
+                        payload={"session_id": str(session_id), "question_id": qid},
+                    )
+                )
+        marks[qid] = mark
+        await db.execute(
+            T.quiz_answers.update().where(
+                T.quiz_answers.c.session_id == session_id,
+                T.quiz_answers.c.question_id == q["id"],
+            ).values(**mark)
+        )
+
     rows: list[S.ReceiptRow] = []
     subtotal = 0.0
     correct = hard = essay_passed = 0
-    lf, nf = float(ses["level_factor"]), float(ses["novelty_factor"])
 
-    for n, qid in enumerate(list(ses["question_order"]), start=1):
+    for n, qid in enumerate(order, start=1):
         q = questions.get(qid)
         if not q:
             continue
         mult = R.DIFFICULTY_FACTOR[q["difficulty"]] * R.TYPE_FACTOR[q["qtype"]]
         label = f"{n} · {'esai' if q['qtype'] == 'essay' else 'PG'} · {q['difficulty']}"
-        a = answers.get(qid)
-
-        if a is None:
-            rows.append(S.ReceiptRow(ordinal=n, label=label, qtype=q["qtype"],
-                                     difficulty=q["difficulty"], multiplier=mult,
-                                     reward_seconds=0.0, voided=True,
-                                     void_reason="tidak dijawab"))
-            continue
+        a = marks[qid]
 
         if a["injection_flag"]:
             rows.append(S.ReceiptRow(ordinal=n, label=label, qtype=q["qtype"],
                                      difficulty=q["difficulty"], multiplier=mult,
                                      reward_seconds=0.0, voided=True,
-                                     void_reason="ditandai"))
+                                     void_reason="ditandai",
+                                     explanation=q["explanation"]))
             continue
 
         earned = float(a["reward_seconds"] or 0)
@@ -318,7 +356,8 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
                                      difficulty=q["difficulty"], multiplier=mult,
                                      reward_seconds=0.0, voided=True,
                                      void_reason="salah",
-                                     score=float(a["score"]) if a["score"] is not None else None))
+                                     score=float(a["score"]) if a["score"] is not None else None,
+                                     explanation=q["explanation"]))
             continue
 
         pre = earned / (lf * nf) if lf * nf else earned
@@ -332,6 +371,7 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
             ordinal=n, label=label, qtype=q["qtype"], difficulty=q["difficulty"],
             multiplier=mult, reward_seconds=round(pre, 2),
             score=float(a["score"]) if a["score"] is not None else None,
+            explanation=q["explanation"],
         ))
 
     gross = subtotal * lf * nf

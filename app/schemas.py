@@ -207,6 +207,7 @@ class QuizOut(BaseModel):
     ready_count: int
     total_count: int
     status: str
+    answered_ids: list[uuid.UUID] = Field(default_factory=list)
     questions: list[QuestionPublic]
 
 
@@ -216,16 +217,10 @@ class AnswerIn(BaseModel):
     essay_text: str | None = Field(default=None, max_length=8000)
 
 
-class AnswerFeedbackOut(BaseModel):
+class AnswerSavedOut(BaseModel):
     question_id: uuid.UUID
-    qtype: str
-    is_correct: bool
-    correct_index: int | None = None
-    score: float | None = None
-    injection_flag: bool = False
-    reward_seconds: float
-    explanation: str | None = None
-    notes: str | None = None
+    answered_count: int
+    total_count: int
 
 
 class ReceiptRow(BaseModel):
@@ -238,6 +233,8 @@ class ReceiptRow(BaseModel):
     voided: bool = False
     void_reason: str | None = None
     score: float | None = None
+    explanation: str | None = None
+
 
 
 class ReceiptOut(BaseModel):

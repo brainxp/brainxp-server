@@ -4,7 +4,7 @@ from app.main import api
 
 SECRETS = {"correct_index", "rubric", "reference_answer"}
 
-ALLOWED = {"AnswerFeedbackOut"}
+ALLOWED: set[str] = set()
 
 
 @pytest.fixture(scope="module")
@@ -77,3 +77,14 @@ def test_orang_tua_punya_jalur_untuk_mengatur_dirinya_sendiri(spec):
     assert path, "orang tua harus bisa membuat subjek pribadinya sendiri"
     schema = path["post"]["responses"]["201"]["content"]["application/json"]["schema"]
     assert schema["$ref"].endswith("/SubjectOut")
+
+
+def test_menjawab_tidak_membocorkan_benar_salah(spec):
+    body = spec["paths"]["/quizzes/{session_id}/answers"]["post"]
+    ref = body["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+    name = ref.rsplit("/", 1)[-1]
+    props = set(spec["components"]["schemas"][name]["properties"])
+    leaks = props & {"is_correct", "score", "reward_seconds", "correct_index", "explanation"}
+    assert not leaks, (
+        f"jawaban dinilai saat dikumpulkan, bukan saat dijawab; {name} membocorkan {leaks}"
+    )

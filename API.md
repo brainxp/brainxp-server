@@ -56,7 +56,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | Operasi | Auth | Kirim | Terima |
 |---|---|---|---|
 | `GET /quizzes/{session_id}` | Bearer | — | 200 `QuizOut` |
-| `POST /quizzes/{session_id}/answers` | Bearer | `AnswerIn` | 200 `AnswerFeedbackOut` |
+| `POST /quizzes/{session_id}/answers` | Bearer | `AnswerIn` | 200 `AnswerSavedOut` |
 | `POST /quizzes/{session_id}/submit` | Bearer | — | 200 `ReceiptOut` |
 | `GET /subjects/{subject_id}/offline-bank` | Bearer | — | 200 `OfflineQuestionOut[]` |
 | `POST /subjects/{subject_id}/quizzes` | Bearer | `QuizStartIn` | 201 `QuizOut` |
@@ -86,8 +86,8 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 ## Skema
 
 - **AdjustIn** — `direction`, `note`, `seconds`
-- **AnswerFeedbackOut** — `correct_index`?, `explanation`?, `injection_flag`?, `is_correct`, `notes`?, `qtype`, `question_id`, `reward_seconds`, `score`?
 - **AnswerIn** — `chosen_index`?, `essay_text`?, `question_id`
+- **AnswerSavedOut** — `answered_count`, `question_id`, `total_count`
 - **BadgeOut** — `code`, `earned`, `earned_at`?, `hint`, `name`
 - **BindingCheckIn** — `install_binding`
 - **BindingCheckOut** — `bound`, `family_mode`?, `subject_name`?
@@ -109,10 +109,10 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **PolicyOut** — `academic_level`, `allowed_upload_methods`, `balance_ceiling_seconds`, `base_reward_seconds`, `daily_cap_seconds`, `day_reset_hour`, `essay_ratio`, `initial_grant_seconds`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`
 - **ProgressOut** — `badges`, `correct_total`, `essay_passed`, `freeze_tokens`, `points`, `sessions`, `streak_current`, `streak_longest`, `subject_id`
 - **QuestionPublic** — `bloom_level`, `difficulty`, `difficulty_factor`, `id`, `options`?, `ordinal`, `qtype`, `rubric_criteria`?, `source_excerpt`, `stem`, `type_factor`
-- **QuizOut** — `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
+- **QuizOut** — `answered_ids`?, `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
 - **QuizStartIn** — `material_id`
 - **ReceiptOut** — `balance_seconds`, `base_reward_seconds`, `ceiling_seconds`, `correct_count`, `credited_seconds`, `gross_seconds`, `level_factor`, `level_note`, `new_badges`, `novelty_factor`, `novelty_note`, `overflow_points`, `question_count`, `rows`, `session_id`, `streak_current`, `subtotal_seconds`, `title`
-- **ReceiptRow** — `difficulty`, `label`, `multiplier`, `ordinal`, `qtype`, `reward_seconds`, `score`?, `void_reason`?, `voided`?
+- **ReceiptRow** — `difficulty`, `explanation`?, `label`, `multiplier`, `ordinal`, `qtype`, `reward_seconds`, `score`?, `void_reason`?, `voided`?
 - **RefreshIn** — `refresh_token`
 - **RegisterIn** — `display_name`, `email`, `mode`?, `password`
 - **ReportOut** — `correct_total`, `days`, `essay_passed`, `guardian_alerts`, `materials_studied`, `recent`, `standing`, `subject`

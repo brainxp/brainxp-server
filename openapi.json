@@ -32,84 +32,6 @@
         "title": "AdjustIn",
         "type": "object"
       },
-      "AnswerFeedbackOut": {
-        "properties": {
-          "correct_index": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Correct Index"
-          },
-          "explanation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Explanation"
-          },
-          "injection_flag": {
-            "default": false,
-            "title": "Injection Flag",
-            "type": "boolean"
-          },
-          "is_correct": {
-            "title": "Is Correct",
-            "type": "boolean"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "qtype": {
-            "title": "Qtype",
-            "type": "string"
-          },
-          "question_id": {
-            "format": "uuid",
-            "title": "Question Id",
-            "type": "string"
-          },
-          "reward_seconds": {
-            "title": "Reward Seconds",
-            "type": "number"
-          },
-          "score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Score"
-          }
-        },
-        "required": [
-          "question_id",
-          "qtype",
-          "is_correct",
-          "reward_seconds"
-        ],
-        "title": "AnswerFeedbackOut",
-        "type": "object"
-      },
       "AnswerIn": {
         "properties": {
           "chosen_index": {
@@ -147,6 +69,30 @@
           "question_id"
         ],
         "title": "AnswerIn",
+        "type": "object"
+      },
+      "AnswerSavedOut": {
+        "properties": {
+          "answered_count": {
+            "title": "Answered Count",
+            "type": "integer"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "question_id",
+          "answered_count",
+          "total_count"
+        ],
+        "title": "AnswerSavedOut",
         "type": "object"
       },
       "BadgeOut": {
@@ -1187,6 +1133,14 @@
       },
       "QuizOut": {
         "properties": {
+          "answered_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Answered Ids",
+            "type": "array"
+          },
           "base_reward_seconds": {
             "title": "Base Reward Seconds",
             "type": "integer"
@@ -1391,6 +1345,17 @@
           "difficulty": {
             "title": "Difficulty",
             "type": "string"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
           },
           "label": {
             "title": "Label",
@@ -2920,7 +2885,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AnswerFeedbackOut"
+                  "$ref": "#/components/schemas/AnswerSavedOut"
                 }
               }
             },
