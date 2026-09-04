@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -143,17 +144,24 @@ def max_possible_reward(
     return per * mcqs + per * TYPE_FACTOR["essay"] * essays
 
 
-@dataclass(frozen=True)
-class Settlement:
-    to_balance: int
-    overflow_points: int
+WEEK = 7
 
 
-def settle(gross_seconds: float, *, balance: int, ceiling: int) -> Settlement:
-    room = max(0, ceiling - balance)
-    to_balance = int(min(gross_seconds, room))
-    overflow = max(0.0, gross_seconds - to_balance)
-    return Settlement(to_balance, int(overflow // 60))
+def cap_for(day: date, caps: Sequence[int]) -> int:
+    return int(caps[day.weekday() % WEEK])
+
+
+def grant_for(day: date, grants: Sequence[int]) -> int:
+    return int(grants[day.weekday() % WEEK])
+
+
+def idle_gap(last_study_day: date | None, today: date) -> int | None:
+    return None if last_study_day is None else (today - last_study_day).days
+
+
+def locked_by_idle(*, last_study_day: date | None, today: date, allowed: int) -> bool:
+    gap = idle_gap(last_study_day, today)
+    return gap is not None and gap > allowed
 
 
 def day_key(moment: datetime, *, reset_hour: int, tz: str = "Asia/Jakarta") -> date:
@@ -169,7 +177,11 @@ def seconds_until_reset(moment: datetime, *, reset_hour: int, tz: str = "Asia/Ja
     return int((nxt - local).total_seconds())
 
 
-def playable_seconds(*, balance: int, daily_cap: int, spent_today: int) -> int:
+def playable_seconds(
+    *, balance: int, daily_cap: int, spent_today: int, idle_locked: bool = False
+) -> int:
+    if idle_locked:
+        return 0
     return max(0, min(balance, daily_cap - spent_today))
 
 
@@ -178,11 +190,16 @@ class BlockReason:
     NO_BALANCE = "no_balance"
     DAILY_CAP = "daily_cap"
     GUARDIAN_STALE = "guardian_stale"
+    IDLE = "idle"
 
 
-def block_reason(*, balance: int, daily_cap: int, spent_today: int) -> str:
+def block_reason(
+    *, balance: int, daily_cap: int, spent_today: int, idle_locked: bool = False
+) -> str:
     if balance <= 0:
         return BlockReason.NO_BALANCE
+    if idle_locked:
+        return BlockReason.IDLE
     if daily_cap - spent_today <= 0:
         return BlockReason.DAILY_CAP
     return BlockReason.NONE

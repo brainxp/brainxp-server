@@ -127,22 +127,51 @@ def test_batas_atas_sesi():
     assert mx == pytest.approx(8 * 192 + 2 * 192 * 1.8)
 
 
-def test_reward_masuk_penuh_saat_masih_ada_ruang():
-    s = R.settle(1800, balance=0, ceiling=10800)
-    assert s.to_balance == 1800
-    assert s.overflow_points == 0
+def test_jatah_harian_mengikuti_hari_dalam_minggu():
+    caps = [3600, 3600, 3600, 3600, 3600, 7200, 7200]
+    senin = date(2026, 9, 7)
+    sabtu = date(2026, 9, 12)
+    minggu = date(2026, 9, 13)
+    assert senin.weekday() == 0
+    assert R.cap_for(senin, caps) == 3600
+    assert R.cap_for(sabtu, caps) == 7200
+    assert R.cap_for(minggu, caps) == 7200
 
 
-def test_kelebihan_di_atas_plafon_jadi_poin_bukan_hangus():
-    s = R.settle(1800, balance=10500, ceiling=10800)
-    assert s.to_balance == 300
-    assert s.overflow_points == 25
+def test_saldo_harian_juga_mengikuti_hari():
+    grants = [0, 0, 0, 0, 0, 1800, 1800]
+    assert R.grant_for(date(2026, 9, 7), grants) == 0
+    assert R.grant_for(date(2026, 9, 12), grants) == 1800
 
 
-def test_saldo_penuh_seluruh_reward_jadi_poin():
-    s = R.settle(600, balance=10800, ceiling=10800)
-    assert s.to_balance == 0
-    assert s.overflow_points == 10
+def test_saldo_terkunci_setelah_melewati_jatah_libur():
+    today = date(2026, 9, 10)
+    assert not R.locked_by_idle(last_study_day=today, today=today, allowed=2)
+    assert not R.locked_by_idle(last_study_day=date(2026, 9, 8), today=today, allowed=2)
+    assert R.locked_by_idle(last_study_day=date(2026, 9, 7), today=today, allowed=2)
+
+
+def test_jatah_libur_nol_berarti_harus_belajar_hari_ini():
+    today = date(2026, 9, 10)
+    assert not R.locked_by_idle(last_study_day=today, today=today, allowed=0)
+    assert R.locked_by_idle(last_study_day=date(2026, 9, 9), today=today, allowed=0)
+
+
+def test_yang_belum_pernah_belajar_tidak_dikunci():
+    assert not R.locked_by_idle(last_study_day=None, today=date(2026, 9, 10), allowed=0)
+
+
+def test_saldo_terkunci_tidak_mengurangi_saldonya():
+    kunci = {"balance": 5400, "daily_cap": 3600, "spent_today": 0}
+    assert R.playable_seconds(**kunci, idle_locked=True) == 0
+    assert R.playable_seconds(**kunci, idle_locked=False) == 3600
+    assert R.block_reason(**kunci, idle_locked=True) == R.BlockReason.IDLE
+
+
+def test_saldo_habis_dilaporkan_sebagai_habis_bukan_terkunci():
+    assert R.block_reason(
+        balance=0, daily_cap=3600, spent_today=0, idle_locked=True
+    ) == R.BlockReason.NO_BALANCE
 
 
 def test_pukul_dua_pagi_masih_terhitung_hari_sebelumnya():

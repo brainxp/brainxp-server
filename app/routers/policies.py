@@ -17,9 +17,9 @@ router = APIRouter(tags=["policy"])
 WEAKEN_DELAY = timedelta(hours=24)
 UNDO_WINDOW = timedelta(minutes=10)
 
-LOOSER_WHEN_HIGHER = {"base_reward_seconds", "daily_cap_seconds", "balance_ceiling_seconds",
-                      "initial_grant_seconds"}
+LOOSER_WHEN_HIGHER = {"base_reward_seconds", "idle_days_allowed"}
 LOOSER_WHEN_LOWER = {"questions_per_session"}
+LOOSER_WHEN_ANY_DAY_HIGHER = {"daily_caps", "daily_grants"}
 
 
 def _out(row) -> S.PolicyOut:
@@ -45,6 +45,10 @@ def _is_weakening(current, changes: dict) -> bool:
         if k in LOOSER_WHEN_HIGHER and v > current[k]:
             return True
         if k in LOOSER_WHEN_LOWER and v < current[k]:
+            return True
+        if k in LOOSER_WHEN_ANY_DAY_HIGHER and any(
+            int(after) > int(before) for after, before in zip(v, current[k], strict=False)
+        ):
             return True
         if k == "locked_apps":
             removed = set(current["locked_apps"] or []) - set(v)

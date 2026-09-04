@@ -21,10 +21,34 @@ class Standing:
     spent_today: int
     playable: int
     block_reason: str
-    ceiling: int
-    points: int
+    idle_days: int
+    idle_days_allowed: int
     seconds_until_reset: int
     day: date
+
+
+async def grant_today(
+    db: AsyncConnection, subject_id: uuid.UUID, *, day: date, seconds: int
+) -> int:
+    claimed = (
+        await db.execute(
+            pg_insert(T.daily_usage)
+            .values(subject_id=subject_id, day_key=day, granted_at=now())
+            .on_conflict_do_update(
+                index_elements=[T.daily_usage.c.subject_id, T.daily_usage.c.day_key],
+                set_={"granted_at": now()},
+                where=T.daily_usage.c.granted_at.is_(None),
+            )
+            .returning(T.daily_usage.c.day_key)
+        )
+    ).first()
+    if not claimed or seconds <= 0:
+        return 0
+    await append(
+        db, subject_id=subject_id, delta_seconds=seconds, entry_type="granted",
+        note="Saldo harian", ref_id=None,
+    )
+    return seconds
 
 
 async def balance(db: AsyncConnection, subject_id: uuid.UUID) -> int:
@@ -55,22 +79,32 @@ async def standing(db: AsyncConnection, subject_id: uuid.UUID) -> Standing:
     moment = now()
     day = R.day_key(moment, reset_hour=pol["day_reset_hour"], tz=tz)
 
+    await grant_today(db, subject_id, day=day, seconds=R.grant_for(day, pol["daily_grants"]))
+
+    cap = R.cap_for(day, pol["daily_caps"])
     bal = await balance(db, subject_id)
     spent = await spent_today(db, subject_id, day)
-    pts = (
-        await db.execute(select(T.progress.c.points).where(T.progress.c.subject_id == subject_id))
-    ).scalar() or 0
+    last_study = (
+        await db.execute(
+            select(T.progress.c.last_study_day).where(T.progress.c.subject_id == subject_id)
+        )
+    ).scalar()
+    locked = R.locked_by_idle(
+        last_study_day=last_study, today=day, allowed=pol["idle_days_allowed"]
+    )
 
     return Standing(
         balance=bal,
-        daily_cap=pol["daily_cap_seconds"],
+        daily_cap=cap,
         spent_today=spent,
-        playable=R.playable_seconds(balance=bal, daily_cap=pol["daily_cap_seconds"], spent_today=spent),
-        block_reason=R.block_reason(
-            balance=bal, daily_cap=pol["daily_cap_seconds"], spent_today=spent
+        playable=R.playable_seconds(
+            balance=bal, daily_cap=cap, spent_today=spent, idle_locked=locked
         ),
-        ceiling=pol["balance_ceiling_seconds"],
-        points=int(pts),
+        block_reason=R.block_reason(
+            balance=bal, daily_cap=cap, spent_today=spent, idle_locked=locked
+        ),
+        idle_days=R.idle_gap(last_study, day) or 0,
+        idle_days_allowed=int(pol["idle_days_allowed"]),
         seconds_until_reset=R.seconds_until_reset(
             moment, reset_hour=pol["day_reset_hour"], tz=tz
         ),
@@ -151,23 +185,11 @@ async def record_consumption(
 async def credit_reward(
     db: AsyncConnection, *, subject_id: uuid.UUID, gross_seconds: float,
     note: str, ref_id: uuid.UUID | None,
-) -> R.Settlement:
-    st = await standing(db, subject_id)
-    s = R.settle(gross_seconds, balance=st.balance, ceiling=st.ceiling)
-
-    if s.to_balance > 0:
+) -> int:
+    credited = int(gross_seconds)
+    if credited > 0:
         await append(
-            db, subject_id=subject_id, delta_seconds=s.to_balance,
+            db, subject_id=subject_id, delta_seconds=credited,
             entry_type="earned", note=note, ref_id=ref_id,
         )
-    if s.overflow_points > 0:
-        await db.execute(
-            T.progress.update()
-            .where(T.progress.c.subject_id == subject_id)
-            .values(points=T.progress.c.points + s.overflow_points)
-        )
-        await append(
-            db, subject_id=subject_id, delta_seconds=0, entry_type="overflow",
-            note=f"{s.overflow_points} poin dari kelebihan plafon", ref_id=ref_id,
-        )
-    return s
+    return credited

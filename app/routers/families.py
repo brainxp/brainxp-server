@@ -18,7 +18,6 @@ from app.security import (
     now,
     sha256,
 )
-from app.services import ledger as L
 from app.services import progress as P
 from app.services import ratelimit as RL
 
@@ -250,27 +249,6 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
         T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])
         .values(consumed_at=now())
     )
-
-    pol = (
-        await db.execute(
-            select(T.policies).where(T.policies.c.subject_id == row["subject_id"])
-        )
-    ).mappings().one()
-    if await L.balance(db, row["subject_id"]) == 0:
-        already = (
-            await db.execute(
-                select(T.time_ledger.c.id).where(
-                    T.time_ledger.c.subject_id == row["subject_id"],
-                    T.time_ledger.c.entry_type == "initial",
-                )
-            )
-        ).first()
-        if not already and pol["initial_grant_seconds"] > 0:
-            await L.append(
-                db, subject_id=row["subject_id"],
-                delta_seconds=pol["initial_grant_seconds"],
-                entry_type="initial", note="Saldo awal dari orang tua",
-            )
 
     access, ttl = issue_access_token(
         user_id=None, subject_id=str(row["subject_id"]), role="child", device_id=str(device_id)

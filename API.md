@@ -105,20 +105,20 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **PairIn** — `code`, `install_binding`, `model_name`?, `platform`?
 - **PairingCodeOut** — `attempts_allowed`, `code`, `expires_at`, `subject_id`
 - **PolicyChangeOut** — `applied`, `message`, `pending_until`?
-- **PolicyIn** — `academic_level`?, `allowed_upload_methods`?, `balance_ceiling_seconds`?, `base_reward_seconds`?, `daily_cap_seconds`?, `day_reset_hour`?, `essay_ratio`?, `initial_grant_seconds`?, `locked_apps`?, `question_language`?, `questions_per_session`?
-- **PolicyOut** — `academic_level`, `allowed_upload_methods`, `balance_ceiling_seconds`, `base_reward_seconds`, `daily_cap_seconds`, `day_reset_hour`, `essay_ratio`, `initial_grant_seconds`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`
-- **ProgressOut** — `badges`, `correct_total`, `essay_passed`, `freeze_tokens`, `points`, `sessions`, `streak_current`, `streak_longest`, `subject_id`
+- **PolicyIn** — `academic_level`?, `allowed_upload_methods`?, `base_reward_seconds`?, `daily_caps`?, `daily_grants`?, `day_reset_hour`?, `essay_ratio`?, `idle_days_allowed`?, `locked_apps`?, `question_language`?, `questions_per_session`?
+- **PolicyOut** — `academic_level`, `allowed_upload_methods`, `base_reward_seconds`, `daily_caps`, `daily_grants`, `day_reset_hour`, `essay_ratio`, `idle_days_allowed`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`
+- **ProgressOut** — `badges`, `correct_total`, `essay_passed`, `freeze_tokens`, `sessions`, `streak_current`, `streak_longest`, `subject_id`
 - **QuestionPublic** — `bloom_level`, `difficulty`, `difficulty_factor`, `id`, `options`?, `ordinal`, `qtype`, `rubric_criteria`?, `source_excerpt`, `stem`, `type_factor`
 - **QuizOut** — `answered_ids`?, `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
 - **QuizStartIn** — `material_id`
-- **ReceiptOut** — `balance_seconds`, `base_reward_seconds`, `ceiling_seconds`, `correct_count`, `credited_seconds`, `gross_seconds`, `level_factor`, `level_note`, `new_badges`, `novelty_factor`, `novelty_note`, `overflow_points`, `question_count`, `rows`, `session_id`, `streak_current`, `subtotal_seconds`, `title`
+- **ReceiptOut** — `balance_seconds`, `base_reward_seconds`, `correct_count`, `credited_seconds`, `gross_seconds`, `level_factor`, `level_note`, `new_badges`, `novelty_factor`, `novelty_note`, `question_count`, `rows`, `session_id`, `streak_current`, `subtotal_seconds`, `title`
 - **ReceiptRow** — `difficulty`, `explanation`?, `label`, `multiplier`, `ordinal`, `qtype`, `reward_seconds`, `score`?, `void_reason`?, `voided`?
 - **RefreshIn** — `refresh_token`
 - **RegisterIn** — `display_name`, `email`, `mode`?, `password`
 - **ReportOut** — `correct_total`, `days`, `essay_passed`, `guardian_alerts`, `materials_studied`, `recent`, `standing`, `subject`
 - **RetentionIn** — `retention_mode`
 - **SelfSubjectIn** — `academic_level`?, `question_language`?
-- **StandingOut** — `balance_seconds`, `block_reason`, `ceiling_seconds`, `daily_cap_seconds`, `freeze_tokens`, `playable_seconds`, `points`, `seconds_until_reset`, `spent_today_seconds`, `streak_current`
+- **StandingOut** — `balance_seconds`, `block_reason`, `daily_cap_seconds`, `freeze_tokens`, `idle_days`, `idle_days_allowed`, `playable_seconds`, `seconds_until_reset`, `spent_today_seconds`, `streak_current`
 - **SubjectOut** — `academic_level`, `display_name`, `id`, `kind`
 - **TokenOut** — `access_token`, `device_secret`?, `expires_in`, `family_id`?, `refresh_token`, `role`, `subject_id`?, `user_id`?
 - **ValidationError** — `ctx`?, `input`?, `loc`, `msg`, `type`

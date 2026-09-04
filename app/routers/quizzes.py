@@ -374,7 +374,7 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
         ))
 
     gross = subtotal * lf * nf
-    settlement = await L.credit_reward(
+    credited = await L.credit_reward(
         db, subject_id=ses["subject_id"], gross_seconds=gross,
         note=mat["topic_summary"] or mat["original_name"] or "Sesi belajar",
         ref_id=session_id,
@@ -391,7 +391,7 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
     await db.execute(
         T.quiz_sessions.update().where(T.quiz_sessions.c.id == session_id).values(
             status="submitted", submitted_at=now(), correct_count=correct,
-            reward_seconds=settlement.to_balance, overflow_points=settlement.overflow_points,
+            reward_seconds=credited,
         )
     )
     await db.execute(
@@ -414,9 +414,8 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
         novelty_factor=nf,
         novelty_note={1.0: "materi baru", 0.6: "pengulangan sebagian"}.get(nf, "materi yang sama"),
         gross_seconds=round(gross, 2),
-        credited_seconds=settlement.to_balance,
-        overflow_points=settlement.overflow_points,
-        balance_seconds=st.balance, ceiling_seconds=st.ceiling,
+        credited_seconds=credited,
+        balance_seconds=st.balance,
         correct_count=correct, question_count=len(rows),
         streak_current=int(prog), new_badges=[b.name for b in badges],
     )

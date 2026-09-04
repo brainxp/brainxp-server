@@ -765,19 +765,6 @@
             ],
             "title": "Allowed Upload Methods"
           },
-          "balance_ceiling_seconds": {
-            "anyOf": [
-              {
-                "maximum": 604800.0,
-                "minimum": 600.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Balance Ceiling Seconds"
-          },
           "base_reward_seconds": {
             "anyOf": [
               {
@@ -791,18 +778,37 @@
             ],
             "title": "Base Reward Seconds"
           },
-          "daily_cap_seconds": {
+          "daily_caps": {
             "anyOf": [
               {
-                "maximum": 86400.0,
-                "minimum": 300.0,
-                "type": "integer"
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 7,
+                "minItems": 7,
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Daily Cap Seconds"
+            "title": "Daily Caps"
+          },
+          "daily_grants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 7,
+                "minItems": 7,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Grants"
           },
           "day_reset_hour": {
             "anyOf": [
@@ -830,10 +836,10 @@
             ],
             "title": "Essay Ratio"
           },
-          "initial_grant_seconds": {
+          "idle_days_allowed": {
             "anyOf": [
               {
-                "maximum": 86400.0,
+                "maximum": 14.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -841,7 +847,7 @@
                 "type": "null"
               }
             ],
-            "title": "Initial Grant Seconds"
+            "title": "Idle Days Allowed"
           },
           "locked_apps": {
             "anyOf": [
@@ -902,17 +908,23 @@
             "title": "Allowed Upload Methods",
             "type": "array"
           },
-          "balance_ceiling_seconds": {
-            "title": "Balance Ceiling Seconds",
-            "type": "integer"
-          },
           "base_reward_seconds": {
             "title": "Base Reward Seconds",
             "type": "integer"
           },
-          "daily_cap_seconds": {
-            "title": "Daily Cap Seconds",
-            "type": "integer"
+          "daily_caps": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Daily Caps",
+            "type": "array"
+          },
+          "daily_grants": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Daily Grants",
+            "type": "array"
           },
           "day_reset_hour": {
             "title": "Day Reset Hour",
@@ -922,8 +934,8 @@
             "title": "Essay Ratio",
             "type": "number"
           },
-          "initial_grant_seconds": {
-            "title": "Initial Grant Seconds",
+          "idle_days_allowed": {
+            "title": "Idle Days Allowed",
             "type": "integer"
           },
           "locked_apps": {
@@ -978,9 +990,9 @@
           "essay_ratio",
           "academic_level",
           "question_language",
-          "initial_grant_seconds",
-          "daily_cap_seconds",
-          "balance_ceiling_seconds",
+          "daily_caps",
+          "daily_grants",
+          "idle_days_allowed",
           "day_reset_hour",
           "allowed_upload_methods",
           "locked_apps"
@@ -1009,10 +1021,6 @@
             "title": "Freeze Tokens",
             "type": "integer"
           },
-          "points": {
-            "title": "Points",
-            "type": "integer"
-          },
           "sessions": {
             "title": "Sessions",
             "type": "integer"
@@ -1033,7 +1041,6 @@
         },
         "required": [
           "subject_id",
-          "points",
           "streak_current",
           "streak_longest",
           "freeze_tokens",
@@ -1238,10 +1245,6 @@
             "title": "Base Reward Seconds",
             "type": "integer"
           },
-          "ceiling_seconds": {
-            "title": "Ceiling Seconds",
-            "type": "integer"
-          },
           "correct_count": {
             "title": "Correct Count",
             "type": "integer"
@@ -1276,10 +1279,6 @@
           "novelty_note": {
             "title": "Novelty Note",
             "type": "string"
-          },
-          "overflow_points": {
-            "title": "Overflow Points",
-            "type": "integer"
           },
           "question_count": {
             "title": "Question Count",
@@ -1329,9 +1328,7 @@
           "novelty_note",
           "gross_seconds",
           "credited_seconds",
-          "overflow_points",
           "balance_seconds",
-          "ceiling_seconds",
           "correct_count",
           "question_count",
           "streak_current",
@@ -1576,14 +1573,11 @@
               "none",
               "no_balance",
               "daily_cap",
-              "guardian_stale"
+              "guardian_stale",
+              "idle"
             ],
             "title": "Block Reason",
             "type": "string"
-          },
-          "ceiling_seconds": {
-            "title": "Ceiling Seconds",
-            "type": "integer"
           },
           "daily_cap_seconds": {
             "title": "Daily Cap Seconds",
@@ -1593,12 +1587,16 @@
             "title": "Freeze Tokens",
             "type": "integer"
           },
-          "playable_seconds": {
-            "title": "Playable Seconds",
+          "idle_days": {
+            "title": "Idle Days",
             "type": "integer"
           },
-          "points": {
-            "title": "Points",
+          "idle_days_allowed": {
+            "title": "Idle Days Allowed",
+            "type": "integer"
+          },
+          "playable_seconds": {
+            "title": "Playable Seconds",
             "type": "integer"
           },
           "seconds_until_reset": {
@@ -1619,8 +1617,8 @@
           "playable_seconds",
           "daily_cap_seconds",
           "spent_today_seconds",
-          "ceiling_seconds",
-          "points",
+          "idle_days",
+          "idle_days_allowed",
           "block_reason",
           "seconds_until_reset",
           "streak_current",

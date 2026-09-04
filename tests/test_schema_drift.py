@@ -5,7 +5,8 @@ import pytest
 
 from app import tables as T
 
-SQL = (Path(__file__).resolve().parents[1] / "migrations" / "001_init.sql").read_text()
+MIGRATIONS = sorted((Path(__file__).resolve().parents[1] / "migrations").glob("*.sql"))
+SQL = "\n".join(p.read_text() for p in MIGRATIONS)
 
 
 def sql_columns() -> dict[str, set[str]]:
@@ -30,6 +31,16 @@ def sql_columns() -> dict[str, set[str]]:
             if re.fullmatch(r"[a-z_][a-z0-9_]*", token):
                 cols.add(token)
         out[name] = cols
+
+    for table, action, column in re.findall(
+        r"ALTER TABLE (\w+)\s+(ADD|DROP) COLUMN (?:IF (?:NOT )?EXISTS )?(\w+)", SQL
+    ):
+        if table not in out:
+            continue
+        if action == "ADD":
+            out[table].add(column)
+        else:
+            out[table].discard(column)
     return out
 
 

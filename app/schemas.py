@@ -85,9 +85,9 @@ class PolicyOut(BaseModel):
     essay_ratio: float
     academic_level: str
     question_language: str
-    initial_grant_seconds: int
-    daily_cap_seconds: int
-    balance_ceiling_seconds: int
+    daily_caps: list[int]
+    daily_grants: list[int]
+    idle_days_allowed: int
     day_reset_hour: int
     allowed_upload_methods: list[str]
     locked_apps: list[str]
@@ -101,9 +101,9 @@ class PolicyIn(BaseModel):
     essay_ratio: float | None = Field(default=None, ge=0, le=1)
     academic_level: Level | None = None
     question_language: Literal["id", "en"] | None = None
-    initial_grant_seconds: int | None = Field(default=None, ge=0, le=86400)
-    daily_cap_seconds: int | None = Field(default=None, ge=300, le=86400)
-    balance_ceiling_seconds: int | None = Field(default=None, ge=600, le=604800)
+    daily_caps: list[int] | None = Field(default=None, min_length=7, max_length=7)
+    daily_grants: list[int] | None = Field(default=None, min_length=7, max_length=7)
+    idle_days_allowed: int | None = Field(default=None, ge=0, le=14)
     day_reset_hour: int | None = Field(default=None, ge=0, le=23)
     allowed_upload_methods: list[Literal["photo", "document"]] | None = None
     locked_apps: list[str] | None = None
@@ -120,9 +120,9 @@ class StandingOut(BaseModel):
     playable_seconds: int
     daily_cap_seconds: int
     spent_today_seconds: int
-    ceiling_seconds: int
-    points: int
-    block_reason: Literal["none", "no_balance", "daily_cap", "guardian_stale"]
+    idle_days: int
+    idle_days_allowed: int
+    block_reason: Literal["none", "no_balance", "daily_cap", "guardian_stale", "idle"]
     seconds_until_reset: int
     streak_current: int
     freeze_tokens: int
@@ -249,9 +249,7 @@ class ReceiptOut(BaseModel):
     novelty_note: str
     gross_seconds: float
     credited_seconds: int
-    overflow_points: int
     balance_seconds: int
-    ceiling_seconds: int
     correct_count: int
     question_count: int
     streak_current: int
@@ -268,7 +266,6 @@ class BadgeOut(BaseModel):
 
 class ProgressOut(BaseModel):
     subject_id: uuid.UUID
-    points: int
     streak_current: int
     streak_longest: int
     freeze_tokens: int

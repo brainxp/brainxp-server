@@ -55,7 +55,7 @@ async def standing(subject_id: uuid.UUID, db: Conn, me: Me):
     return S.StandingOut(
         balance_seconds=st.balance, playable_seconds=playable,
         daily_cap_seconds=st.daily_cap, spent_today_seconds=st.spent_today,
-        ceiling_seconds=st.ceiling, points=st.points, block_reason=reason,
+        idle_days=st.idle_days, idle_days_allowed=st.idle_days_allowed, block_reason=reason,
         seconds_until_reset=st.seconds_until_reset,
         streak_current=int(prog["streak_current"]), freeze_tokens=int(prog["freeze_tokens"]),
     )

@@ -33,7 +33,7 @@ async def progress(subject_id: uuid.UUID, db: Conn, me: Me):
         ).mappings().all()
     }
     return S.ProgressOut(
-        subject_id=subject_id, points=row["points"],
+        subject_id=subject_id,
         streak_current=row["streak_current"], streak_longest=row["streak_longest"],
         freeze_tokens=row["freeze_tokens"], sessions=row["sessions"],
         correct_total=row["correct_total"], essay_passed=row["essay_passed"],
