@@ -153,6 +153,24 @@ async def login(body: S.LoginIn, db: Conn, request: Request):
     )
 
 
+REPLAY_GRACE = timedelta(seconds=30)
+
+
+async def _reply_was_lost(db, row) -> bool:
+    if now() - row["used_at"] > REPLAY_GRACE:
+        return False
+    later_use = (
+        await db.execute(
+            select(T.refresh_tokens.c.id).where(
+                T.refresh_tokens.c.family_chain == row["family_chain"],
+                T.refresh_tokens.c.id != row["id"],
+                T.refresh_tokens.c.used_at.is_not(None),
+            )
+        )
+    ).first()
+    return later_use is None
+
+
 @router.post("/auth/refresh", response_model=S.TokenOut)
 async def refresh(body: S.RefreshIn, db: Conn):
     digest = sha256(body.refresh_token)
@@ -164,21 +182,34 @@ async def refresh(body: S.RefreshIn, db: Conn):
     if not row:
         raise Unauthorized("Refresh token tidak dikenal.")
 
-    if row["used_at"] is not None or row["revoked_at"] is not None:
+    if row["revoked_at"] is not None:
+        raise Unauthorized("Sesi perangkat ini sudah dicabut. Masuk lagi untuk melanjutkan.")
+
+    if row["expires_at"] <= now():
+        raise Unauthorized("Refresh token sudah kedaluwarsa.")
+
+    if row["used_at"] is None:
+        await db.execute(
+            T.refresh_tokens.update()
+            .where(T.refresh_tokens.c.id == row["id"]).values(used_at=now())
+        )
+    elif await _reply_was_lost(db, row):
+        await db.execute(
+            T.refresh_tokens.update()
+            .where(
+                T.refresh_tokens.c.family_chain == row["family_chain"],
+                T.refresh_tokens.c.used_at.is_(None),
+                T.refresh_tokens.c.revoked_at.is_(None),
+            )
+            .values(revoked_at=now())
+        )
+    else:
         await db.execute(
             T.refresh_tokens.update()
             .where(T.refresh_tokens.c.family_chain == row["family_chain"])
             .values(revoked_at=now())
         )
         raise Unauthorized("Refresh token dipakai ulang. Seluruh sesi perangkat ini dicabut.")
-
-    if row["expires_at"] <= now():
-        raise Unauthorized("Refresh token sudah kedaluwarsa.")
-
-    await db.execute(
-        T.refresh_tokens.update()
-        .where(T.refresh_tokens.c.id == row["id"]).values(used_at=now())
-    )
 
     if row["user_id"]:
         user = (
