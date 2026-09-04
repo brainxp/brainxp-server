@@ -14,13 +14,14 @@ from app import tables as T
 from app.config import settings
 from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Forbidden, Invalid, NotFound, RateLimited
+from app.routes import CommitBeforeResponse
 from app.security import now
 from app.services import documents, storage
 from app.services import ledger as L
 from app.services import ratelimit as RL
 from app.services.generation import CHANNEL
 
-router = APIRouter(tags=["materials"])
+router = APIRouter(tags=["materials"], route_class=CommitBeforeResponse)
 
 _DERIVED = {"times_studied", "question_count"}
 

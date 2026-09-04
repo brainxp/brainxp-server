@@ -10,9 +10,10 @@ from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject, require_policy_writer
 from app.errors import Conflict, NotFound
+from app.routes import CommitBeforeResponse
 from app.security import now
 
-router = APIRouter(tags=["policy"])
+router = APIRouter(tags=["policy"], route_class=CommitBeforeResponse)
 
 WEAKEN_DELAY = timedelta(hours=24)
 UNDO_WINDOW = timedelta(minutes=10)

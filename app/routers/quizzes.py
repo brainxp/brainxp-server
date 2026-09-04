@@ -11,6 +11,7 @@ from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Conflict, Forbidden, Invalid, NotFound, RateLimited
+from app.routes import CommitBeforeResponse
 from app.security import now
 from app.services import grading
 from app.services import ledger as L
@@ -18,7 +19,7 @@ from app.services import progress as PR
 from app.services import ratelimit as RL
 from app.services import rules as R
 
-router = APIRouter(tags=["quiz"])
+router = APIRouter(tags=["quiz"], route_class=CommitBeforeResponse)
 
 
 def _public(q, perm: list[int]) -> S.QuestionPublic:

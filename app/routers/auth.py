@@ -11,6 +11,7 @@ from app import tables as T
 from app.config import settings
 from app.deps import Conn, Me
 from app.errors import Conflict, RateLimited, Unauthorized
+from app.routes import CommitBeforeResponse
 from app.security import (
     hash_password,
     issue_access_token,
@@ -23,7 +24,7 @@ from app.security import (
 from app.services import progress as P
 from app.services import ratelimit as RL
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(tags=["auth"], route_class=CommitBeforeResponse)
 
 DEFAULT_UPLOAD = ["photo", "document"]
 
