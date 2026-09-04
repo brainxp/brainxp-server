@@ -113,7 +113,8 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
         )
     ).mappings().first()
     if not dev:
-        alerts.append("Belum ada perangkat yang berpasangan.")
+        if subject["kind"] != "personal":
+            alerts.append("Belum ada perangkat yang berpasangan.")
     else:
         if dev["last_heartbeat_at"] and now() - dev["last_heartbeat_at"] > timedelta(minutes=5):
             alerts.append("Perangkat berhenti melapor. Saldo dibekukan sampai terhubung kembali.")
