@@ -90,25 +90,34 @@ def _rows_for(qs_id: uuid.UUID, items: list[GeneratedQuestion], start: int, batc
     return out
 
 
+def _overflow(q: GeneratedQuestion) -> str | None:
+    checks: list[tuple[str, int, int]] = [
+        ("stem", len(q.stem), L.STEM_MAX),
+        ("source_excerpt", len(q.source_excerpt), L.EXCERPT_MAX),
+        ("explanation", len(q.explanation), L.EXPLANATION_MAX),
+        ("reference_answer", len(q.reference_answer or ""), L.REFERENCE_MAX),
+    ]
+    checks += [("option", len(o), L.OPTION_MAX) for o in (q.options or [])]
+    for c in q.rubric or []:
+        checks.append(("criterion", len(c.criterion), L.CRITERION_MAX))
+        checks.append(("indicator", len(c.indicator), L.INDICATOR_MAX))
+
+    for name, size, cap in checks:
+        if size > cap:
+            return f"{name} {size} melebihi {cap}"
+    return None
+
+
 def _within_limits(q: GeneratedQuestion) -> bool:
-    return (
-        len(q.stem) <= L.STEM_MAX
-        and len(q.source_excerpt) <= L.EXCERPT_MAX
-        and len(q.explanation) <= L.EXPLANATION_MAX
-        and len(q.reference_answer or "") <= L.REFERENCE_MAX
-        and all(len(o) <= L.OPTION_MAX for o in (q.options or []))
-        and all(
-            len(c.criterion) <= L.CRITERION_MAX and len(c.indicator) <= L.INDICATOR_MAX
-            for c in (q.rubric or [])
-        )
-    )
+    return _overflow(q) is None
 
 
 def _rejection(q: GeneratedQuestion) -> str | None:
     if not q.stem.strip() or not q.source_excerpt.strip():
         return "kosong"
-    if not _within_limits(q):
-        return "melebihi batas panjang"
+    over = _overflow(q)
+    if over:
+        return f"melebihi batas panjang: {over}"
     if q.qtype == "essay":
         if not q.rubric or not 2 <= len(q.rubric) <= 5:
             return "rubrik esai tidak lengkap"
