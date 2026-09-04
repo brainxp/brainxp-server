@@ -3186,6 +3186,58 @@
         ]
       }
     },
+    "/subjects/{subject_id}": {
+      "delete": {
+        "operationId": "remove_subject_subjects__subject_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Subject",
+        "tags": [
+          "family"
+        ]
+      }
+    },
     "/subjects/{subject_id}/ledger": {
       "get": {
         "operationId": "history_subjects__subject_id__ledger_get",

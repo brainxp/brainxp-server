@@ -95,6 +95,48 @@ async def create_child(body: S.ChildIn, db: Conn, me: Me):
     )
 
 
+@router.delete("/subjects/{subject_id}", status_code=204)
+async def remove_subject(subject_id: uuid.UUID, db: Conn, me: Me):
+    if not me.is_parent:
+        raise Forbidden("Hanya orang tua yang dapat menghapus profil.")
+    subject = await authorize_subject(db, me, subject_id)
+
+    await db.execute(
+        T.subjects.update().where(T.subjects.c.id == subject_id).values(deleted_at=now())
+    )
+    devices = [
+        r[0] for r in (
+            await db.execute(
+                select(T.devices.c.id).where(
+                    T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
+                )
+            )
+        ).all()
+    ]
+    if devices:
+        await db.execute(
+            T.devices.update().where(T.devices.c.id.in_(devices)).values(unbound_at=now())
+        )
+        await db.execute(
+            T.refresh_tokens.update().where(
+                T.refresh_tokens.c.device_id.in_(devices),
+                T.refresh_tokens.c.revoked_at.is_(None),
+            ).values(revoked_at=now())
+        )
+    await db.execute(
+        T.pairing_codes.delete().where(
+            T.pairing_codes.c.subject_id == subject_id,
+            T.pairing_codes.c.consumed_at.is_(None),
+        )
+    )
+    await db.execute(
+        T.audit_log.insert().values(
+            actor_user_id=me.user_id, action="remove_subject",
+            target=f"{subject['display_name']} ({subject['kind']})",
+        )
+    )
+
+
 @router.post("/subjects/self", response_model=S.SubjectOut, status_code=201)
 async def create_own_subject(body: S.SelfSubjectIn, db: Conn, me: Me):
     if not me.is_parent:

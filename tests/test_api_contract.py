@@ -118,3 +118,9 @@ def test_kode_pemasangan_menyebut_perangkat_yang_sudah_terdaftar(spec):
         "orang tua harus tahu ada perangkat lain sebelum menyerahkan kode, karena "
         "memasangkan yang baru mengeluarkan yang lama"
     )
+
+
+def test_menghapus_profil_tersedia_dan_tanpa_isi_balasan(spec):
+    delete = spec["paths"]["/subjects/{subject_id}"].get("delete")
+    assert delete, "orang tua harus bisa menghapus profil anak"
+    assert "204" in delete["responses"]

@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 36 operasi pada 32 path.
+Versi 0.1.0. 37 operasi pada 33 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -26,6 +26,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `GET /subjects` | Bearer | — | 200 `SubjectOut[]` |
 | `POST /subjects` | Bearer | `ChildIn` | 201 `SubjectOut` |
 | `POST /subjects/self` | Bearer | `SelfSubjectIn` | 201 `SubjectOut` |
+| `DELETE /subjects/{subject_id}` | Bearer | — | 204 |
 | `POST /subjects/{subject_id}/pairing-code` | Bearer | — | 200 `PairingCodeOut` |
 
 ## Aturan
