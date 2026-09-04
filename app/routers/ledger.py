@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app import schemas as S
 from app import tables as T
-from app.deps import Conn, Me, authorize_subject
+from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Conflict, Forbidden
 from app.security import now
 from app.services import ledger as L
@@ -65,9 +65,8 @@ async def standing(subject_id: uuid.UUID, db: Conn, me: Me):
 async def sync_consumption(
     subject_id: uuid.UUID, body: list[S.ConsumptionIn], db: Conn, me: Me
 ):
-    await authorize_subject(db, me, subject_id)
-    if me.is_parent:
-        raise Forbidden("Konsumsi dilaporkan oleh perangkat, bukan orang tua.")
+    if is_proxy(me, await authorize_subject(db, me, subject_id)):
+        raise Forbidden("Konsumsi dilaporkan oleh perangkat yang memakainya.")
 
     for item in body[:200]:
         await L.record_consumption(

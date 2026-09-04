@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app import schemas as S
 from app import tables as T
-from app.deps import Conn, Me, authorize_subject
+from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Conflict, Forbidden, Invalid, NotFound
 from app.security import now
 from app.services import grading
@@ -34,6 +34,11 @@ def _public(q, perm: list[int]) -> S.QuestionPublic:
     )
 
 
+def _deny_proxy(me, subject: dict) -> None:
+    if is_proxy(me, subject):
+        raise Forbidden("Sesi ini dikerjakan oleh pemilik materinya sendiri.")
+
+
 async def _load(db, session_id: uuid.UUID):
     ses = (
         await db.execute(select(T.quiz_sessions).where(T.quiz_sessions.c.id == session_id))
@@ -45,9 +50,7 @@ async def _load(db, session_id: uuid.UUID):
 
 @router.post("/subjects/{subject_id}/quizzes", response_model=S.QuizOut, status_code=201)
 async def start_quiz(subject_id: uuid.UUID, body: S.QuizStartIn, db: Conn, me: Me):
-    await authorize_subject(db, me, subject_id)
-    if me.is_parent:
-        raise Forbidden("Sesi dikerjakan oleh pemilik materi.")
+    _deny_proxy(me, await authorize_subject(db, me, subject_id))
 
     mat = (
         await db.execute(select(T.materials).where(T.materials.c.id == body.material_id))
@@ -197,9 +200,7 @@ async def get_quiz(session_id: uuid.UUID, db: Conn, me: Me):
 @router.post("/quizzes/{session_id}/answers", response_model=S.AnswerSavedOut)
 async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
     ses = await _load(db, session_id)
-    await authorize_subject(db, me, ses["subject_id"])
-    if me.is_parent:
-        raise Forbidden("Sesi dikerjakan oleh pemilik materi.")
+    _deny_proxy(me, await authorize_subject(db, me, ses["subject_id"]))
     if ses["status"] != "open":
         raise Conflict("Sesi ini sudah dikumpulkan.", code="session_closed")
 
@@ -243,9 +244,7 @@ async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
 @router.post("/quizzes/{session_id}/submit", response_model=S.ReceiptOut)
 async def submit(session_id: uuid.UUID, db: Conn, me: Me):
     ses = await _load(db, session_id)
-    await authorize_subject(db, me, ses["subject_id"])
-    if me.is_parent:
-        raise Forbidden("Sesi dikumpulkan oleh pemilik materi.")
+    _deny_proxy(me, await authorize_subject(db, me, ses["subject_id"]))
     if ses["status"] != "open":
         raise Conflict("Sesi ini sudah dikumpulkan.", code="session_closed")
 

@@ -12,7 +12,7 @@ from app import queue as Q
 from app import schemas as S
 from app import tables as T
 from app.config import settings
-from app.deps import Conn, Me, authorize_subject
+from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Forbidden, Invalid, NotFound, RateLimited
 from app.security import now
 from app.services import documents, storage
@@ -107,9 +107,7 @@ async def get_material(material_id: uuid.UUID, db: Conn, me: Me):
     ).mappings().first()
     if not row or row["deleted_at"]:
         raise NotFound("Materi tidak ditemukan.")
-    await authorize_subject(db, me, row["subject_id"])
-
-    if me.is_parent:
+    if is_proxy(me, await authorize_subject(db, me, row["subject_id"])):
         row = {**dict(row), "topic_summary": None}
 
     qcount = (
@@ -185,7 +183,7 @@ async def stream_material(material_id: uuid.UUID, db: Conn, me: Me):
 
 @router.get("/subjects/{subject_id}/library", response_model=list[S.MaterialOut])
 async def library(subject_id: uuid.UUID, db: Conn, me: Me):
-    await authorize_subject(db, me, subject_id)
+    hidden = is_proxy(me, await authorize_subject(db, me, subject_id))
     rows = (
         await db.execute(
             select(T.materials).where(
@@ -199,7 +197,7 @@ async def library(subject_id: uuid.UUID, db: Conn, me: Me):
     out: list[S.MaterialOut] = []
     for r in rows:
         d = dict(r)
-        if me.is_parent:
+        if hidden:
             d["topic_summary"] = None
         studied = (
             await db.execute(
@@ -227,8 +225,7 @@ async def material_file(material_id: uuid.UUID, db: Conn, me: Me):
     ).mappings().first()
     if not row or row["deleted_at"]:
         raise NotFound("Materi tidak ditemukan.")
-    await authorize_subject(db, me, row["subject_id"])
-    if me.is_parent:
+    if is_proxy(me, await authorize_subject(db, me, row["subject_id"])):
         raise Forbidden("Isi materi anak bukan bagian dari laporan orang tua.")
     if not row["storage_key"]:
         raise NotFound("Berkas asli sudah dihapus.")
@@ -243,8 +240,7 @@ async def set_retention(material_id: uuid.UUID, body: S.RetentionIn, db: Conn, m
     ).mappings().first()
     if not row or row["deleted_at"]:
         raise NotFound("Materi tidak ditemukan.")
-    await authorize_subject(db, me, row["subject_id"])
-    if me.is_parent:
+    if is_proxy(me, await authorize_subject(db, me, row["subject_id"])):
         raise Forbidden("Retensi materi ditentukan pemiliknya.")
 
     if body.retention_mode == "auto_purge" and row["storage_key"]:
@@ -268,8 +264,7 @@ async def delete_material(material_id: uuid.UUID, db: Conn, me: Me):
     ).mappings().first()
     if not row:
         raise NotFound("Materi tidak ditemukan.")
-    await authorize_subject(db, me, row["subject_id"])
-    if me.is_parent:
+    if is_proxy(me, await authorize_subject(db, me, row["subject_id"])):
         raise Forbidden("Materi hanya dapat dihapus pemiliknya.")
 
     if row["storage_key"]:

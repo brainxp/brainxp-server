@@ -79,3 +79,7 @@ async def require_policy_writer(db: AsyncConnection, me: Caller, subject_id: uui
     if me.role == "child":
         raise Forbidden("Aturan hanya dapat diubah oleh orang tua.")
     return subject
+
+
+def is_proxy(me: Caller, subject: dict) -> bool:
+    return me.is_parent and subject.get("user_id") != me.user_id

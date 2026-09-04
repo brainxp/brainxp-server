@@ -88,3 +88,18 @@ def test_menjawab_tidak_membocorkan_benar_salah(spec):
     assert not leaks, (
         f"jawaban dinilai saat dikumpulkan, bukan saat dijawab; {name} membocorkan {leaks}"
     )
+
+
+def test_orang_tua_bukan_perantara_untuk_subjeknya_sendiri():
+    from types import SimpleNamespace
+
+    from app.deps import is_proxy
+
+    me = SimpleNamespace(is_parent=True, user_id="u1")
+    assert is_proxy(me, {"user_id": "u2"}), "subjek anak tetap dilindungi"
+    assert not is_proxy(me, {"user_id": "u1"}), (
+        "orang tua yang mengatur dirinya sendiri bukan perantara, jadi tidak "
+        "boleh terkena penjaga privasi yang ditujukan untuk materi anak"
+    )
+    child = SimpleNamespace(is_parent=False, user_id=None)
+    assert not is_proxy(child, {"user_id": None})
