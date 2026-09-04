@@ -104,24 +104,39 @@ def _within_limits(q: GeneratedQuestion) -> bool:
     )
 
 
-def _valid(q: GeneratedQuestion) -> bool:
+def _rejection(q: GeneratedQuestion) -> str | None:
     if not q.stem.strip() or not q.source_excerpt.strip():
-        return False
+        return "kosong"
     if not _within_limits(q):
-        return False
-    if q.qtype == "mcq":
-        if not q.options or len(q.options) != 4:
-            return False
-        if q.correct_index is None or not 0 <= q.correct_index < 4:
-            return False
-        cleaned = [o.strip().lower() for o in q.options]
-        if len(set(cleaned)) != 4 or any(not o for o in cleaned):
-            return False
-        banned = ("semua benar", "tidak ada yang benar", "all of the above", "none of the above")
-        return not any(any(b in o for b in banned) for o in cleaned)
-    if not q.rubric or not 2 <= len(q.rubric) <= 5:
-        return False
-    return bool(q.reference_answer and q.reference_answer.strip())
+        return "melebihi batas panjang"
+    if q.qtype == "essay":
+        if not q.rubric or not 2 <= len(q.rubric) <= 5:
+            return "rubrik esai tidak lengkap"
+        if not (q.reference_answer or "").strip():
+            return "esai tanpa jawaban acuan"
+        return None
+    if not q.options or len(q.options) != 4:
+        return "pilihan ganda bukan empat opsi"
+    if q.correct_index is None or not 0 <= q.correct_index < 4:
+        return "kunci jawaban di luar jangkauan"
+    cleaned = [o.strip().lower() for o in q.options]
+    if len(set(cleaned)) != 4 or any(not o for o in cleaned):
+        return "opsi kembar atau kosong"
+    banned = ("semua benar", "tidak ada yang benar", "all of the above", "none of the above")
+    if any(any(b in o for b in banned) for o in cleaned):
+        return "memakai opsi terlarang"
+    return None
+
+
+def _keep(items: list[GeneratedQuestion]) -> list[GeneratedQuestion]:
+    kept: list[GeneratedQuestion] = []
+    for q in items:
+        why = _rejection(q)
+        if why:
+            log.warning("soal %s dibuang: %s", q.qtype, why)
+        else:
+            kept.append(q)
+    return kept
 
 
 def _dedupe(items: list[GeneratedQuestion]) -> list[GeneratedQuestion]:
@@ -250,7 +265,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
             language=pol["question_language"],
             avoid=avoid,
         )
-        good = _dedupe([q for q in result.questions if _valid(q)])
+        good = _dedupe(_keep(result.questions))
         if not good:
             return []
         rows = _rows_for(qs_id, good, start, batch)

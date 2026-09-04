@@ -61,3 +61,26 @@ def test_batas_panjang_menolak_soal_yang_kepanjangan():
                                      weight=0.5, indicator="z")],
     })
     assert not _within_limits(rubrik_panjang)
+
+
+def test_alasan_pembuangan_soal_disebutkan():
+    from app.services import llm as L
+    from app.services.generation import _rejection
+
+    wajar = L.GeneratedQuestion(
+        qtype="mcq", stem="Apa itu isolasi transaksi?",
+        options=["A", "B", "C", "D"], correct_index=0,
+        source_excerpt="Tingkat isolasi menentukan anomali.",
+        explanation="Menentukan anomali yang boleh terjadi.",
+        difficulty="sedang", bloom_level="understand",
+    )
+    assert _rejection(wajar) is None
+
+    esai = wajar.model_copy(update={
+        "qtype": "essay", "options": None, "correct_index": None,
+        "rubric": None, "reference_answer": "jawaban acuan",
+    })
+    assert _rejection(esai) == "rubrik esai tidak lengkap"
+
+    kembar = wajar.model_copy(update={"options": ["A", "A", "C", "D"]})
+    assert _rejection(kembar) == "opsi kembar atau kosong"
