@@ -233,3 +233,12 @@ def test_alasan_pemblokiran_punya_nilai_khusus_untuk_penjaga_basi():
 
 def test_saldo_utuh_tidak_pernah_dilaporkan_kehabisan_saldo():
     assert R.block_reason(balance=1740, daily_cap=3600, spent_today=60) == R.BlockReason.NONE
+
+
+def test_worker_menunggu_baris_materi_cukup_lama():
+    from app.services import generation as G
+
+    assert G.VISIBILITY_TRIES * G.VISIBILITY_PAUSE >= 3.0, (
+        "unggahan besar butuh beberapa detik untuk commit; jendela tunggunya "
+        "harus lebih panjang dari itu supaya worker tidak menyerah lebih dulu"
+    )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -114,10 +115,23 @@ def _dedupe(items: list[GeneratedQuestion]) -> list[GeneratedQuestion]:
     return kept
 
 
+VISIBILITY_TRIES = 12
+VISIBILITY_PAUSE = 0.4
+
+
+async def _await_material(db: AsyncConnection, material_id: uuid.UUID) -> dict:
+    for _ in range(VISIBILITY_TRIES):
+        row = (
+            await db.execute(select(T.materials).where(T.materials.c.id == material_id))
+        ).mappings().first()
+        if row:
+            return dict(row)
+        await asyncio.sleep(VISIBILITY_PAUSE)
+    raise LookupError(f"materi {material_id} tidak pernah muncul")
+
+
 async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
-    mat = (
-        await db.execute(select(T.materials).where(T.materials.c.id == material_id))
-    ).mappings().one()
+    mat = await _await_material(db, material_id)
     pol = (
         await db.execute(select(T.policies).where(T.policies.c.subject_id == mat["subject_id"]))
     ).mappings().one()
