@@ -281,6 +281,11 @@ def test_soal_tidak_bisa_jadi_wadah_teks_panjang():
     assert L.OPTION_MAX <= 400
     assert L.REFERENCE_MAX <= 2000
     assert L.CRITERION_MAX <= 400
+    assert L.INDICATOR_MAX <= 400
+    assert L.INDICATOR_MAX >= 250, (
+        "indikator rubrik yang ditulis model terukur sampai 229 karakter; "
+        "batas di bawah itu membuang esainya diam-diam"
+    )
 
 
 def test_batas_panjang_tidak_membatalkan_seluruh_batch():

@@ -38,8 +38,8 @@ OPTION_MAX = 300
 EXCERPT_MAX = 500
 EXPLANATION_MAX = 700
 REFERENCE_MAX = 1500
-CRITERION_MAX = 250
-INDICATOR_MAX = 120
+CRITERION_MAX = 300
+INDICATOR_MAX = 300
 
 
 class GeneratedQuestion(BaseModel):
@@ -166,8 +166,9 @@ Aturan yang tidak boleh dilanggar:
 7. Jumlah pilihan ganda dan esai yang diminta harus dipenuhi tepat. Esai tetap
    dibuat walau butuh rubrik dan jawaban acuan.
 8. Tulis padat. Ruang yang tersedia: pertanyaan 600 karakter, pembahasan 700,
-   jawaban acuan 1500, tiap opsi 300, tiap kriteria rubrik 250. Ruang itu lebih
-   dari cukup; tidak perlu memakainya sampai habis."""
+   jawaban acuan 1500, tiap opsi 300, tiap kriteria rubrik 300, tiap indikator
+   rubrik 300. Ruang itu lebih dari cukup; tidak perlu memakainya sampai
+   habis."""
 
 GRADE_SYSTEM = """\
 Kamu menilai satu jawaban esai terhadap rubrik yang sudah ditetapkan sebelum
