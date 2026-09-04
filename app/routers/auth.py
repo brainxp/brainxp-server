@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request
 from sqlalchemy import select
@@ -156,19 +156,20 @@ async def login(body: S.LoginIn, db: Conn, request: Request):
 REPLAY_GRACE = timedelta(seconds=30)
 
 
-async def _reply_was_lost(db, row) -> bool:
-    if now() - row["used_at"] > REPLAY_GRACE:
-        return False
-    later_use = (
+def replay_is_recoverable(*, used_at: datetime, chain_moved_on: bool, at: datetime) -> bool:
+    return not chain_moved_on and at - used_at <= REPLAY_GRACE
+
+
+async def _chain_moved_on(db, row) -> bool:
+    later = (
         await db.execute(
             select(T.refresh_tokens.c.id).where(
                 T.refresh_tokens.c.family_chain == row["family_chain"],
-                T.refresh_tokens.c.id != row["id"],
-                T.refresh_tokens.c.used_at.is_not(None),
+                T.refresh_tokens.c.used_at > row["used_at"],
             )
         )
     ).first()
-    return later_use is None
+    return later is not None
 
 
 @router.post("/auth/refresh", response_model=S.TokenOut)
@@ -193,7 +194,9 @@ async def refresh(body: S.RefreshIn, db: Conn):
             T.refresh_tokens.update()
             .where(T.refresh_tokens.c.id == row["id"]).values(used_at=now())
         )
-    elif await _reply_was_lost(db, row):
+    elif replay_is_recoverable(
+        used_at=row["used_at"], chain_moved_on=await _chain_moved_on(db, row), at=now()
+    ):
         await db.execute(
             T.refresh_tokens.update()
             .where(
