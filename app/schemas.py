@@ -54,7 +54,15 @@ class SubjectOut(BaseModel):
     kind: str
 
 
+class BoundDeviceOut(BaseModel):
+    platform: str
+    model_name: str | None = None
+    last_heartbeat_at: datetime | None = None
+    paired_at: datetime
+
+
 class PairingCodeOut(BaseModel):
+    bound_device: BoundDeviceOut | None = None
     code: str
     subject_id: uuid.UUID
     expires_at: datetime

@@ -149,6 +149,14 @@ async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
         raise Forbidden("Hanya orang tua yang dapat menerbitkan kode.")
     subject = await authorize_subject(db, me, subject_id)
 
+    bound = (
+        await db.execute(
+            select(T.devices).where(
+                T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
+            ).order_by(T.devices.c.created_at.desc()).limit(1)
+        )
+    ).mappings().first()
+
     await db.execute(
         T.pairing_codes.delete().where(
             T.pairing_codes.c.subject_id == subject_id,
@@ -181,6 +189,10 @@ async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
     return S.PairingCodeOut(
         code=code, subject_id=subject_id, expires_at=expires,
         attempts_allowed=PAIRING_MAX_ATTEMPTS,
+        bound_device=None if not bound else S.BoundDeviceOut(
+            platform=bound["platform"], model_name=bound["model_name"],
+            last_heartbeat_at=bound["last_heartbeat_at"], paired_at=bound["created_at"],
+        ),
     )
 
 
@@ -244,6 +256,35 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
             ).returning(T.devices.c.id)
         )
     ).scalar_one()
+
+    replaced = [
+        r[0] for r in (
+            await db.execute(
+                select(T.devices.c.id).where(
+                    T.devices.c.subject_id == row["subject_id"],
+                    T.devices.c.id != device_id,
+                    T.devices.c.unbound_at.is_(None),
+                )
+            )
+        ).all()
+    ]
+    if replaced:
+        await db.execute(
+            T.devices.update().where(T.devices.c.id.in_(replaced)).values(unbound_at=now())
+        )
+        await db.execute(
+            T.refresh_tokens.update().where(
+                T.refresh_tokens.c.device_id.in_(replaced),
+                T.refresh_tokens.c.revoked_at.is_(None),
+            ).values(revoked_at=now())
+        )
+        await db.execute(
+            T.guardian_events.insert().values(
+                subject_id=row["subject_id"], device_id=device_id,
+                event_type="device_replaced",
+                payload={"unbound": [str(d) for d in replaced]},
+            )
+        )
 
     await db.execute(
         T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])

@@ -196,6 +196,48 @@
         "title": "Body_upload_material_subjects__subject_id__materials_post",
         "type": "object"
       },
+      "BoundDeviceOut": {
+        "properties": {
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "paired_at": {
+            "format": "date-time",
+            "title": "Paired At",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "paired_at"
+        ],
+        "title": "BoundDeviceOut",
+        "type": "object"
+      },
       "ChildIn": {
         "properties": {
           "academic_level": {
@@ -672,6 +714,16 @@
           "attempts_allowed": {
             "title": "Attempts Allowed",
             "type": "integer"
+          },
+          "bound_device": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundDeviceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "code": {
             "title": "Code",

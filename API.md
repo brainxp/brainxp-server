@@ -92,6 +92,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **BindingCheckIn** — `install_binding`
 - **BindingCheckOut** — `bound`, `family_mode`?, `subject_name`?
 - **Body_upload_material_subjects__subject_id__materials_post** — `file`, `method`?
+- **BoundDeviceOut** — `last_heartbeat_at`?, `model_name`?, `paired_at`, `platform`
 - **ChildIn** — `academic_level`?, `display_name`, `question_language`?
 - **ConsumptionIn** — `app_label`, `client_event_id`, `occurred_at`?, `seconds`
 - **DayPointOut** — `consumed_seconds`, `day`, `earned_seconds`
@@ -103,7 +104,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **MaterialOut** — `assessed_level`?, `concept_density`?, `created_at`, `declared_level`?, `detected_language`?, `gate_reason`?, `gate_verdict`?, `id`, `novelty_score`?, `original_name`, `page_count`?, `question_count`?, `retention_mode`, `source_type`, `status`, `times_studied`?, `topic_summary`?
 - **OfflineQuestionOut** — `answer_hmac`, `difficulty`, `id`, `options`, `qtype`, `source_excerpt`, `stem`
 - **PairIn** — `code`, `install_binding`, `model_name`?, `platform`?
-- **PairingCodeOut** — `attempts_allowed`, `code`, `expires_at`, `subject_id`
+- **PairingCodeOut** — `attempts_allowed`, `bound_device`?, `code`, `expires_at`, `subject_id`
 - **PolicyChangeOut** — `applied`, `message`, `pending_until`?
 - **PolicyIn** — `academic_level`?, `allowed_upload_methods`?, `base_reward_seconds`?, `daily_caps`?, `daily_grants`?, `day_reset_hour`?, `essay_ratio`?, `idle_days_allowed`?, `locked_apps`?, `question_language`?, `questions_per_session`?
 - **PolicyOut** — `academic_level`, `allowed_upload_methods`, `base_reward_seconds`, `daily_caps`, `daily_grants`, `day_reset_hour`, `essay_ratio`, `idle_days_allowed`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`

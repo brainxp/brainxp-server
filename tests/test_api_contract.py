@@ -110,3 +110,11 @@ def test_soal_per_sesi_dibatasi_sepuluh(spec):
     bounds = next(v for v in field["anyOf"] if v.get("type") == "integer")
     assert bounds["maximum"] == 10, "batas yang ditampilkan di layar harus dijaga API juga"
     assert bounds["minimum"] == 1
+
+
+def test_kode_pemasangan_menyebut_perangkat_yang_sudah_terdaftar(spec):
+    schema = spec["components"]["schemas"]["PairingCodeOut"]["properties"]
+    assert "bound_device" in schema, (
+        "orang tua harus tahu ada perangkat lain sebelum menyerahkan kode, karena "
+        "memasangkan yang baru mengeluarkan yang lama"
+    )
