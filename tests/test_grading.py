@@ -36,3 +36,20 @@ def test_penilaian_pilihan_ganda_deterministik():
     assert grade_mcq(chosen_index=2, correct_index=2)
     assert not grade_mcq(chosen_index=1, correct_index=2)
     assert not grade_mcq(chosen_index=None, correct_index=2)
+
+
+def test_batas_panjang_menolak_soal_yang_kepanjangan():
+    from app.services import llm as L
+    from app.services.generation import _within_limits
+
+    wajar = L.GeneratedQuestion(
+        qtype="mcq", stem="Apa itu gaya gesek?",
+        options=["A", "B", "C", "D"], correct_index=0,
+        source_excerpt="Gaya gesek muncul saat dua permukaan bersentuhan.",
+        explanation="Gesekan melawan arah gerak.",
+        difficulty="sedang", bloom_level="understand",
+    )
+    assert _within_limits(wajar)
+
+    kepanjangan = wajar.model_copy(update={"explanation": "x" * (L.EXPLANATION_MAX + 1)})
+    assert not _within_limits(kepanjangan)

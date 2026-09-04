@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
@@ -17,6 +17,7 @@ from app.errors import Forbidden, Invalid, NotFound, RateLimited
 from app.security import now
 from app.services import documents, storage
 from app.services import ledger as L
+from app.services import ratelimit as RL
 from app.services.generation import CHANNEL
 
 router = APIRouter(tags=["materials"])
@@ -40,11 +41,18 @@ async def upload_material(
     db: Conn,
     me: Me,
     tasks: BackgroundTasks,
+    request: Request,
     file: UploadFile = File(...),
     method: str = Form("document"),
 ):
     await authorize_subject(db, me, subject_id)
     s = settings()
+
+    ip = RL.client_ip(dict(request.headers), request.client.host if request.client else None)
+    if not await RL.hit(f"upload:ip:{ip}", RL.UPLOAD_PER_IP):
+        raise RateLimited("Terlalu banyak unggahan dari jaringan ini. Coba lagi nanti.")
+    if not await RL.hit("upload:global", RL.UPLOAD_GLOBAL):
+        raise RateLimited("Antrean penyiapan soal sedang penuh. Coba lagi sebentar.")
 
     pol = (
         await db.execute(select(T.policies).where(T.policies.c.subject_id == subject_id))

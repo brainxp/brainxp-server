@@ -15,6 +15,11 @@ PAIR_PER_IP = Window(limit=10, seconds=600)
 PAIR_GLOBAL = Window(limit=120, seconds=600)
 LOGIN_PER_IP = Window(limit=15, seconds=600)
 
+REGISTER_PER_IP = Window(limit=5, seconds=3600)
+UPLOAD_PER_IP = Window(limit=40, seconds=3600)
+UPLOAD_GLOBAL = Window(limit=400, seconds=3600)
+SUBMIT_PER_SUBJECT = Window(limit=30, seconds=3600)
+
 
 def exceeded(count: int, window: Window) -> bool:
     return count > window.limit

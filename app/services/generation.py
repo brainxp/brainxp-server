@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app import queue as Q
 from app import tables as T
 from app.services import documents, storage
+from app.services import llm as L
 from app.services import rules as R
 from app.services.llm import PROMPT_VERSION, Attachment, GeneratedQuestion, provider
 
@@ -89,8 +90,20 @@ def _rows_for(qs_id: uuid.UUID, items: list[GeneratedQuestion], start: int, batc
     return out
 
 
+def _within_limits(q: GeneratedQuestion) -> bool:
+    return (
+        len(q.stem) <= L.STEM_MAX
+        and len(q.source_excerpt) <= L.EXCERPT_MAX
+        and len(q.explanation) <= L.EXPLANATION_MAX
+        and len(q.reference_answer or "") <= L.REFERENCE_MAX
+        and all(len(o) <= L.OPTION_MAX for o in (q.options or []))
+    )
+
+
 def _valid(q: GeneratedQuestion) -> bool:
-    if not q.stem.strip() or not q.source_excerpt.strip() or len(q.stem) > 600:
+    if not q.stem.strip() or not q.source_excerpt.strip():
+        return False
+    if not _within_limits(q):
         return False
     if q.qtype == "mcq":
         if not q.options or len(q.options) != 4:

@@ -50,7 +50,11 @@ async def _issue_pair(
 
 
 @router.post("/auth/register", response_model=S.TokenOut, status_code=201)
-async def register(body: S.RegisterIn, db: Conn):
+async def register(body: S.RegisterIn, db: Conn, request: Request):
+    ip = RL.client_ip(dict(request.headers), request.client.host if request.client else None)
+    if not await RL.hit(f"register:ip:{ip}", RL.REGISTER_PER_IP):
+        raise RateLimited("Terlalu banyak akun dibuat dari jaringan ini. Coba lagi nanti.")
+
     exists = (
         await db.execute(select(T.users.c.id).where(T.users.c.email == body.email.lower()))
     ).first()

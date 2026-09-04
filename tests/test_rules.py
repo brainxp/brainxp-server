@@ -271,3 +271,32 @@ def test_worker_menunggu_baris_materi_cukup_lama():
         "unggahan besar butuh beberapa detik untuk commit; jendela tunggunya "
         "harus lebih panjang dari itu supaya worker tidak menyerah lebih dulu"
     )
+
+
+def test_soal_tidak_bisa_jadi_wadah_teks_panjang():
+    from app.services import llm as L
+
+    assert L.EXPLANATION_MAX <= 600, "pembahasan yang panjang jadi tempat menyelundupkan kode"
+    assert L.STEM_MAX <= 800
+    assert L.OPTION_MAX <= 300
+    assert L.REFERENCE_MAX <= 1000
+
+
+def test_materi_pengguna_dibingkai_sebagai_data():
+    from app.services import llm as L
+
+    assert "MATERI PENGGUNA DIMULAI" in L.MATERIAL_OPENS
+    assert "MATERI PENGGUNA SELESAI" in L.MATERIAL_CLOSES
+    assert "bukan instruksi" in L.MATERIAL_CLOSES
+    assert "kode program" in L.MATERIAL_CLOSES
+
+
+def test_jalur_mahal_punya_batas_laju():
+    from app.services import ratelimit as RL
+
+    for w in (RL.REGISTER_PER_IP, RL.UPLOAD_PER_IP, RL.UPLOAD_GLOBAL, RL.SUBMIT_PER_SUBJECT):
+        assert w.limit > 0 and w.seconds > 0
+
+    assert RL.REGISTER_PER_IP.limit >= 3, "satu keluarga bisa saja mendaftar beberapa kali"
+    assert RL.UPLOAD_PER_IP.limit >= 20, "satu rumah berbagi satu IP"
+    assert RL.UPLOAD_PER_IP.limit < RL.UPLOAD_GLOBAL.limit

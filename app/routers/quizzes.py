@@ -10,11 +10,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject, is_proxy
-from app.errors import Conflict, Forbidden, Invalid, NotFound
+from app.errors import Conflict, Forbidden, Invalid, NotFound, RateLimited
 from app.security import now
 from app.services import grading
 from app.services import ledger as L
 from app.services import progress as PR
+from app.services import ratelimit as RL
 from app.services import rules as R
 
 router = APIRouter(tags=["quiz"])
@@ -245,6 +246,8 @@ async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
 async def submit(session_id: uuid.UUID, db: Conn, me: Me):
     ses = await _load(db, session_id)
     _deny_proxy(me, await authorize_subject(db, me, ses["subject_id"]))
+    if not await RL.hit(f"submit:{ses['subject_id']}", RL.SUBMIT_PER_SUBJECT):
+        raise RateLimited("Terlalu banyak sesi dikumpulkan dalam sejam. Coba lagi nanti.")
     if ses["status"] != "open":
         raise Conflict("Sesi ini sudah dikumpulkan.", code="session_closed")
 
