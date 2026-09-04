@@ -11,11 +11,12 @@ from app import tables as T
 from app.config import settings
 from app.deps import Conn, Me, authorize_subject
 from app.routers.ledger import standing as read_standing
+from app.routes import CommitBeforeResponse
 from app.security import now
 from app.services import progress as PR
 from app.services import rules as R
 
-router = APIRouter(tags=["reports"])
+router = APIRouter(tags=["reports"], route_class=CommitBeforeResponse)
 
 
 @router.get("/subjects/{subject_id}/progress", response_model=S.ProgressOut)

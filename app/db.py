@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from app.config import settings
@@ -27,6 +28,15 @@ async def dispose() -> None:
         _engine = None
 
 
-async def conn() -> AsyncIterator[AsyncConnection]:
-    async with engine().begin() as c:
-        yield c
+async def conn(request: Request) -> AsyncIterator[AsyncConnection]:
+    async with engine().connect() as c:
+        tx = await c.begin()
+        request.state.tx = tx
+        try:
+            yield c
+        except BaseException:
+            if tx.is_active:
+                await tx.rollback()
+            raise
+        if tx.is_active:
+            await tx.commit()

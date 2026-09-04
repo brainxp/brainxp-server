@@ -10,6 +10,7 @@ from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject
 from app.errors import Conflict, Forbidden, NotFound, RateLimited
+from app.routes import CommitBeforeResponse
 from app.security import (
     issue_access_token,
     new_device_secret,
@@ -21,7 +22,7 @@ from app.security import (
 from app.services import progress as P
 from app.services import ratelimit as RL
 
-router = APIRouter(tags=["family"])
+router = APIRouter(tags=["family"], route_class=CommitBeforeResponse)
 
 PAIRING_TTL = 600
 PAIRING_MAX_ATTEMPTS = 5
