@@ -316,3 +316,17 @@ def test_jalur_mahal_punya_batas_laju():
     assert RL.REGISTER_PER_IP.limit >= 3, "satu keluarga bisa saja mendaftar beberapa kali"
     assert RL.UPLOAD_PER_IP.limit >= 20, "satu rumah berbagi satu IP"
     assert RL.UPLOAD_PER_IP.limit < RL.UPLOAD_GLOBAL.limit
+
+
+def test_batas_panjang_tidak_diancamkan_ke_model():
+    from app.services import llm as L
+
+    prompt = " ".join(L.GEN_SYSTEM.split())
+    assert "dibuang" not in prompt, (
+        "menyebut soal akan dibuang membuat model menghindari esai, yang butuh "
+        "rubrik dan jawaban acuan lebih panjang"
+    )
+    assert "Esai tetap dibuat" in prompt
+    assert "Nilai berkasnya" not in L.MATERIAL_CLOSES, (
+        "instruksi menilai berkas milik gerbang, bukan penyusun soal"
+    )
