@@ -289,6 +289,10 @@ def test_materi_pengguna_dibingkai_sebagai_data():
     assert "MATERI PENGGUNA SELESAI" in L.MATERIAL_CLOSES
     assert "bukan instruksi" in L.MATERIAL_CLOSES
     assert "kode program" in L.MATERIAL_CLOSES
+    assert "bukan bahan belajar" not in L.MATERIAL_CLOSES, (
+        "penegasan batas tidak boleh mengarahkan vonis gerbang; itu membuat "
+        "materi bersih ikut ditolak"
+    )
 
 
 def test_jalur_mahal_punya_batas_laju():
