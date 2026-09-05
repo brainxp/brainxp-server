@@ -13,6 +13,7 @@ from app.deps import Conn, Me, authorize_subject
 from app.routers.ledger import standing as read_standing
 from app.routes import CommitBeforeResponse
 from app.security import now
+from app.services import devices as D
 from app.services import progress as PR
 from app.services import rules as R
 
@@ -146,4 +147,5 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
             for r in recent
         ],
         guardian_alerts=alerts,
+        device=D.as_bound(await D.active(db, subject_id)),
     )

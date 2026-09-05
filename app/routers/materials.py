@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
@@ -23,16 +23,48 @@ from app.services.generation import CHANNEL
 
 router = APIRouter(tags=["materials"], route_class=CommitBeforeResponse)
 
-_DERIVED = {"times_studied", "question_count"}
+_DERIVED = {"times_studied", "question_count", "unfinished"}
 
 
-def _material_out(row, *, times_studied: int, question_count: int) -> S.MaterialOut:
+def _material_out(
+    row, *, times_studied: int, question_count: int,
+    unfinished: S.UnfinishedOut | None = None,
+) -> S.MaterialOut:
     d = dict(row)
     for k in ("concept_density", "novelty_score"):
         if d.get(k) is not None:
             d[k] = float(d[k])
     base = {k: d.get(k) for k in S.MaterialOut.model_fields if k not in _DERIVED}
-    return S.MaterialOut(**base, times_studied=times_studied, question_count=question_count)
+    return S.MaterialOut(
+        **base, times_studied=times_studied, question_count=question_count,
+        unfinished=unfinished,
+    )
+
+
+async def _unfinished(db, material_id: uuid.UUID) -> S.UnfinishedOut | None:
+    row = (
+        await db.execute(
+            select(
+                T.quiz_sessions.c.id,
+                func.jsonb_array_length(T.quiz_sessions.c.question_order).label("total"),
+            )
+            .join(T.question_sets, T.question_sets.c.id == T.quiz_sessions.c.question_set_id)
+            .where(T.question_sets.c.material_id == material_id,
+                   T.quiz_sessions.c.status == "open")
+            .order_by(T.quiz_sessions.c.started_at.desc()).limit(1)
+        )
+    ).mappings().first()
+    if not row:
+        return None
+    answered = (
+        await db.execute(
+            select(func.count()).select_from(T.quiz_answers)
+            .where(T.quiz_answers.c.session_id == row["id"])
+        )
+    ).scalar_one()
+    return S.UnfinishedOut(
+        session_id=row["id"], answered=int(answered), total=int(row["total"] or 0)
+    )
 
 
 @router.post("/subjects/{subject_id}/materials", response_model=S.MaterialAcceptedOut,
@@ -44,7 +76,6 @@ async def upload_material(
     tasks: BackgroundTasks,
     request: Request,
     file: UploadFile = File(...),
-    method: str = Form("document"),
 ):
     await authorize_subject(db, me, subject_id)
     s = settings()
@@ -58,14 +89,19 @@ async def upload_material(
     pol = (
         await db.execute(select(T.policies).where(T.policies.c.subject_id == subject_id))
     ).mappings().one()
+
+    method = documents.method_for(documents.classify(file.content_type or ""))
     if method not in (pol["allowed_upload_methods"] or []):
-        raise Forbidden(f"Metode unggah '{method}' tidak diizinkan oleh aturan.")
+        raise Forbidden(
+            "Menyetor lewat foto belum diizinkan oleh aturan."
+            if method == "photo"
+            else "Menyetor lewat dokumen belum diizinkan oleh aturan."
+        )
 
     data = await file.read()
     if not data:
         raise Invalid("Berkas kosong.")
     documents.guard_size(data, s.max_upload_bytes)
-    documents.classify(file.content_type or "")
 
     st = await L.standing(db, subject_id)
     hits = await Q.upload_quota_hit(str(subject_id), st.day.isoformat())
@@ -135,7 +171,10 @@ async def get_material(material_id: uuid.UUID, db: Conn, me: Me):
         )
     ).scalar_one()
 
-    return _material_out(row, times_studied=int(studied), question_count=int(qcount))
+    return _material_out(
+        row, times_studied=int(studied), question_count=int(qcount),
+        unfinished=await _unfinished(db, material_id),
+    )
 
 
 @router.get("/materials/{material_id}/stream")
@@ -223,7 +262,10 @@ async def library(subject_id: uuid.UUID, db: Conn, me: Me):
                 .where(T.question_sets.c.material_id == r["id"])
             )
         ).scalar_one()
-        out.append(_material_out(d, times_studied=int(studied), question_count=int(qcount)))
+        out.append(_material_out(
+            d, times_studied=int(studied), question_count=int(qcount),
+            unfinished=await _unfinished(db, r["id"]),
+        ))
     return out
 
 

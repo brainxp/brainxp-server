@@ -95,6 +95,42 @@
         "title": "AnswerSavedOut",
         "type": "object"
       },
+      "AnswerStateOut": {
+        "properties": {
+          "chosen_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Index"
+          },
+          "essay_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Essay Text"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id"
+        ],
+        "title": "AnswerStateOut",
+        "type": "object"
+      },
       "BadgeOut": {
         "properties": {
           "code": {
@@ -182,11 +218,6 @@
           "file": {
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "type": "string"
-          },
-          "method": {
-            "default": "document",
-            "title": "Method",
             "type": "string"
           }
         },
@@ -607,6 +638,16 @@
               }
             ],
             "title": "Topic Summary"
+          },
+          "unfinished": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnfinishedOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1200,6 +1241,13 @@
             "title": "Answered Ids",
             "type": "array"
           },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerStateOut"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
           "base_reward_seconds": {
             "title": "Base Reward Seconds",
             "type": "integer"
@@ -1528,6 +1576,16 @@
             "title": "Days",
             "type": "array"
           },
+          "device": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundDeviceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "essay_passed": {
             "title": "Essay Passed",
             "type": "integer"
@@ -1781,6 +1839,30 @@
           "role"
         ],
         "title": "TokenOut",
+        "type": "object"
+      },
+      "UnfinishedOut": {
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "integer"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "answered",
+          "total"
+        ],
+        "title": "UnfinishedOut",
         "type": "object"
       },
       "ValidationError": {
@@ -3233,6 +3315,58 @@
           }
         },
         "summary": "Remove Subject",
+        "tags": [
+          "family"
+        ]
+      }
+    },
+    "/subjects/{subject_id}/device": {
+      "delete": {
+        "operationId": "release_device_subjects__subject_id__device_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Device",
         "tags": [
           "family"
         ]

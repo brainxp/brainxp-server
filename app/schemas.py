@@ -156,6 +156,12 @@ class AdjustIn(BaseModel):
     note: str = Field(min_length=3, max_length=200)
 
 
+class UnfinishedOut(BaseModel):
+    session_id: uuid.UUID
+    answered: int
+    total: int
+
+
 class MaterialOut(BaseModel):
     id: uuid.UUID
     original_name: str | None
@@ -174,6 +180,7 @@ class MaterialOut(BaseModel):
     created_at: datetime
     times_studied: int = 0
     question_count: int = 0
+    unfinished: UnfinishedOut | None = None
 
 
 class MaterialAcceptedOut(BaseModel):
@@ -204,6 +211,12 @@ class QuizStartIn(BaseModel):
     material_id: uuid.UUID
 
 
+class AnswerStateOut(BaseModel):
+    question_id: uuid.UUID
+    chosen_index: int | None = None
+    essay_text: str | None = None
+
+
 class QuizOut(BaseModel):
     session_id: uuid.UUID
     material_id: uuid.UUID
@@ -216,6 +229,7 @@ class QuizOut(BaseModel):
     total_count: int
     status: str
     answered_ids: list[uuid.UUID] = Field(default_factory=list)
+    answers: list[AnswerStateOut] = Field(default_factory=list)
     questions: list[QuestionPublic]
 
 
@@ -298,6 +312,7 @@ class ReportOut(BaseModel):
     essay_passed: int
     recent: list[LedgerEntryOut]
     guardian_alerts: list[str]
+    device: BoundDeviceOut | None = None
 
 
 class HeartbeatIn(BaseModel):

@@ -143,6 +143,19 @@ async def start_quiz(subject_id: uuid.UUID, body: S.QuizStartIn, db: Conn, me: M
     )
 
 
+async def _saved_answers(db, session_id: uuid.UUID) -> list[S.AnswerStateOut]:
+    rows = (
+        await db.execute(
+            select(
+                T.quiz_answers.c.question_id,
+                T.quiz_answers.c.chosen_index,
+                T.quiz_answers.c.essay_text,
+            ).where(T.quiz_answers.c.session_id == session_id)
+        )
+    ).mappings().all()
+    return [S.AnswerStateOut(**dict(r)) for r in rows]
+
+
 @router.get("/quizzes/{session_id}", response_model=S.QuizOut)
 async def get_quiz(session_id: uuid.UUID, db: Conn, me: Me):
     ses = await _load(db, session_id)
@@ -177,6 +190,8 @@ async def get_quiz(session_id: uuid.UUID, db: Conn, me: Me):
             .values(question_order=order, option_permutation=perms)
         )
 
+    saved = await _saved_answers(db, session_id)
+
     return S.QuizOut(
         session_id=session_id, material_id=qs["material_id"], title=mat["topic_summary"],
         base_reward_seconds=ses["base_reward_seconds"],
@@ -187,14 +202,8 @@ async def get_quiz(session_id: uuid.UUID, db: Conn, me: Me):
         )),
         ready_count=qs["ready_count"], total_count=qs["requested_count"],
         status=qs["status"],
-        answered_ids=[
-            r[0] for r in (
-                await db.execute(
-                    select(T.quiz_answers.c.question_id)
-                    .where(T.quiz_answers.c.session_id == session_id)
-                )
-            ).all()
-        ],
+        answered_ids=[a.question_id for a in saved],
+        answers=saved,
         questions=[_public(rows[q], perms.get(q, [])) for q in order if q in rows],
     )
 
