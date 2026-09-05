@@ -51,6 +51,10 @@ def classify(media_type: str) -> str:
     )
 
 
+def method_for(kind: str) -> str:
+    return "photo" if kind == "image" else "document"
+
+
 def guard_size(data: bytes, limit: int) -> None:
     if len(data) > limit:
         raise TooLarge(f"Berkas {len(data) // 1_048_576} MB melampaui batas {limit // 1_048_576} MB.")

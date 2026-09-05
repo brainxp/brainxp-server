@@ -19,6 +19,7 @@ from app.security import (
     now,
     sha256,
 )
+from app.services import devices as D
 from app.services import progress as P
 from app.services import ratelimit as RL
 
@@ -105,25 +106,7 @@ async def remove_subject(subject_id: uuid.UUID, db: Conn, me: Me):
     await db.execute(
         T.subjects.update().where(T.subjects.c.id == subject_id).values(deleted_at=now())
     )
-    devices = [
-        r[0] for r in (
-            await db.execute(
-                select(T.devices.c.id).where(
-                    T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
-                )
-            )
-        ).all()
-    ]
-    if devices:
-        await db.execute(
-            T.devices.update().where(T.devices.c.id.in_(devices)).values(unbound_at=now())
-        )
-        await db.execute(
-            T.refresh_tokens.update().where(
-                T.refresh_tokens.c.device_id.in_(devices),
-                T.refresh_tokens.c.revoked_at.is_(None),
-            ).values(revoked_at=now())
-        )
+    await D.release(db, subject_id)
     await db.execute(
         T.pairing_codes.delete().where(
             T.pairing_codes.c.subject_id == subject_id,
@@ -192,13 +175,7 @@ async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
         raise Forbidden("Hanya orang tua yang dapat menerbitkan kode.")
     subject = await authorize_subject(db, me, subject_id)
 
-    bound = (
-        await db.execute(
-            select(T.devices).where(
-                T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
-            ).order_by(T.devices.c.created_at.desc()).limit(1)
-        )
-    ).mappings().first()
+    bound = await D.active(db, subject_id)
 
     await db.execute(
         T.pairing_codes.delete().where(
@@ -232,10 +209,24 @@ async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
     return S.PairingCodeOut(
         code=code, subject_id=subject_id, expires_at=expires,
         attempts_allowed=PAIRING_MAX_ATTEMPTS,
-        bound_device=None if not bound else S.BoundDeviceOut(
-            platform=bound["platform"], model_name=bound["model_name"],
-            last_heartbeat_at=bound["last_heartbeat_at"], paired_at=bound["created_at"],
-        ),
+        bound_device=D.as_bound(bound),
+    )
+
+
+@router.delete("/subjects/{subject_id}/device", status_code=204)
+async def release_device(subject_id: uuid.UUID, db: Conn, me: Me):
+    if not me.is_parent:
+        raise Forbidden("Hanya orang tua yang dapat mengeluarkan perangkat.")
+    subject = await authorize_subject(db, me, subject_id)
+
+    if not await D.release(db, subject_id):
+        raise NotFound("Tidak ada perangkat yang sedang terdaftar.")
+
+    await db.execute(
+        T.audit_log.insert().values(
+            actor_user_id=me.user_id, action="release_device",
+            target=f"{subject['display_name']} ({subject['kind']})",
+        )
     )
 
 

@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 37 operasi pada 33 path.
+Versi 0.1.0. 38 operasi pada 34 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -27,6 +27,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `POST /subjects` | Bearer | `ChildIn` | 201 `SubjectOut` |
 | `POST /subjects/self` | Bearer | `SelfSubjectIn` | 201 `SubjectOut` |
 | `DELETE /subjects/{subject_id}` | Bearer | — | 204 |
+| `DELETE /subjects/{subject_id}/device` | Bearer | — | 204 |
 | `POST /subjects/{subject_id}/pairing-code` | Bearer | — | 200 `PairingCodeOut` |
 
 ## Aturan
@@ -89,10 +90,11 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **AdjustIn** — `direction`, `note`, `seconds`
 - **AnswerIn** — `chosen_index`?, `essay_text`?, `question_id`
 - **AnswerSavedOut** — `answered_count`, `question_id`, `total_count`
+- **AnswerStateOut** — `chosen_index`?, `essay_text`?, `question_id`
 - **BadgeOut** — `code`, `earned`, `earned_at`?, `hint`, `name`
 - **BindingCheckIn** — `install_binding`
 - **BindingCheckOut** — `bound`, `family_mode`?, `subject_name`?
-- **Body_upload_material_subjects__subject_id__materials_post** — `file`, `method`?
+- **Body_upload_material_subjects__subject_id__materials_post** — `file`
 - **BoundDeviceOut** — `last_heartbeat_at`?, `model_name`?, `paired_at`, `platform`
 - **ChildIn** — `academic_level`?, `display_name`, `question_language`?
 - **ConsumptionIn** — `app_label`, `client_event_id`, `occurred_at`?, `seconds`
@@ -102,7 +104,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **LedgerEntryOut** — `delta_seconds`, `entry_type`, `note`, `occurred_at`
 - **LoginIn** — `email`, `password`
 - **MaterialAcceptedOut** — `duplicate_of`?, `material_id`, `status`
-- **MaterialOut** — `assessed_level`?, `concept_density`?, `created_at`, `declared_level`?, `detected_language`?, `gate_reason`?, `gate_verdict`?, `id`, `novelty_score`?, `original_name`, `page_count`?, `question_count`?, `retention_mode`, `source_type`, `status`, `times_studied`?, `topic_summary`?
+- **MaterialOut** — `assessed_level`?, `concept_density`?, `created_at`, `declared_level`?, `detected_language`?, `gate_reason`?, `gate_verdict`?, `id`, `novelty_score`?, `original_name`, `page_count`?, `question_count`?, `retention_mode`, `source_type`, `status`, `times_studied`?, `topic_summary`?, `unfinished`?
 - **OfflineQuestionOut** — `answer_hmac`, `difficulty`, `id`, `options`, `qtype`, `source_excerpt`, `stem`
 - **PairIn** — `code`, `install_binding`, `model_name`?, `platform`?
 - **PairingCodeOut** — `attempts_allowed`, `bound_device`?, `code`, `expires_at`, `subject_id`
@@ -111,18 +113,19 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **PolicyOut** — `academic_level`, `allowed_upload_methods`, `base_reward_seconds`, `daily_caps`, `daily_grants`, `day_reset_hour`, `essay_ratio`, `idle_days_allowed`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`
 - **ProgressOut** — `badges`, `correct_total`, `essay_passed`, `freeze_tokens`, `sessions`, `streak_current`, `streak_longest`, `subject_id`
 - **QuestionPublic** — `bloom_level`, `difficulty`, `difficulty_factor`, `id`, `options`?, `ordinal`, `qtype`, `rubric_criteria`?, `source_excerpt`, `stem`, `type_factor`
-- **QuizOut** — `answered_ids`?, `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
+- **QuizOut** — `answered_ids`?, `answers`?, `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
 - **QuizStartIn** — `material_id`
 - **ReceiptOut** — `balance_seconds`, `base_reward_seconds`, `correct_count`, `credited_seconds`, `gross_seconds`, `level_factor`, `level_note`, `new_badges`, `novelty_factor`, `novelty_note`, `question_count`, `rows`, `session_id`, `streak_current`, `subtotal_seconds`, `title`
 - **ReceiptRow** — `difficulty`, `explanation`?, `label`, `multiplier`, `ordinal`, `qtype`, `reward_seconds`, `score`?, `void_reason`?, `voided`?
 - **RefreshIn** — `refresh_token`
 - **RegisterIn** — `display_name`, `email`, `mode`?, `password`
-- **ReportOut** — `correct_total`, `days`, `essay_passed`, `guardian_alerts`, `materials_studied`, `recent`, `standing`, `subject`
+- **ReportOut** — `correct_total`, `days`, `device`?, `essay_passed`, `guardian_alerts`, `materials_studied`, `recent`, `standing`, `subject`
 - **RetentionIn** — `retention_mode`
 - **SelfSubjectIn** — `academic_level`?, `question_language`?
 - **StandingOut** — `balance_seconds`, `block_reason`, `daily_cap_seconds`, `freeze_tokens`, `idle_days`, `idle_days_allowed`, `playable_seconds`, `seconds_until_reset`, `spent_today_seconds`, `streak_current`
 - **SubjectOut** — `academic_level`, `display_name`, `id`, `kind`
 - **TokenOut** — `access_token`, `device_secret`?, `expires_in`, `family_id`?, `refresh_token`, `role`, `subject_id`?, `user_id`?
+- **UnfinishedOut** — `answered`, `session_id`, `total`
 - **ValidationError** — `ctx`?, `input`?, `loc`, `msg`, `type`
 
 ## Yang tidak pernah dikirim ke klien
