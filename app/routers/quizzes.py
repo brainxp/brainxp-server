@@ -113,6 +113,12 @@ async def start_quiz(subject_id: uuid.UUID, body: S.QuizStartIn, db: Conn, me: M
     ).all()
     novelty = R.novelty_factor(len(times))
     level = R.level_factor(pol["academic_level"], mat["assessed_level"] or pol["academic_level"])
+    if level == 0.0:
+        raise Conflict(
+            "Materi ini di bawah jenjang yang berlaku sekarang, jadi soalnya tidak "
+            "menguji apa pun.",
+            code="level_too_low",
+        )
 
     session_id = (
         await db.execute(
@@ -423,7 +429,7 @@ async def submit(session_id: uuid.UUID, db: Conn, me: Me):
         base_reward_seconds=ses["base_reward_seconds"],
         rows=rows, subtotal_seconds=round(subtotal, 2),
         level_factor=lf,
-        level_note="setara" if lf == 1.0 else "satu tingkat di bawah",
+        level_note="setara atau di atas jenjang" if lf == 1.0 else "di bawah jenjang",
         novelty_factor=nf,
         novelty_note={1.0: "materi baru", 0.6: "pengulangan sebagian"}.get(nf, "materi yang sama"),
         gross_seconds=round(gross, 2),

@@ -13,7 +13,8 @@ JKT = ZoneInfo("Asia/Jakarta")
     [
         ("smp", "smp", 1.0),
         ("smp", "sma", 1.0),
-        ("sma", "smp", 0.6),
+        ("sd", "profesional", 1.0),
+        ("sma", "smp", 0.0),
         ("sma", "sd", 0.0),
         ("kuliah", "sd", 0.0),
     ],
@@ -31,22 +32,26 @@ def test_gate_menolak_materi_dua_tingkat_di_bawah():
     assert out.reject_reason == R.RejectReason.LEVEL_TOO_LOW
 
 
-def test_gate_menerima_smp_dengan_materi_sd_sebagai_satu_tingkat():
-    out = R.evaluate_gate(
-        declared_level="smp", assessed_level="sd",
-        concept_density=0.5, is_study_material=True, times_seen=0,
-    )
-    assert out.accepted
-    assert out.level_factor == 0.6
-
-
-def test_gate_menerima_satu_tingkat_di_bawah_dengan_reward_lebih_kecil():
+def test_gate_menolak_materi_satu_tingkat_di_bawah():
     out = R.evaluate_gate(
         declared_level="sma", assessed_level="smp",
         concept_density=0.5, is_study_material=True, times_seen=0,
     )
+    assert not out.accepted, (
+        "materi di bawah jenjang tidak menguji apa pun, seberapa pun dekat jaraknya"
+    )
+    assert out.reject_reason == R.RejectReason.LEVEL_TOO_LOW
+
+
+def test_gate_menerima_materi_di_atas_jenjang_dengan_reward_penuh():
+    out = R.evaluate_gate(
+        declared_level="sma", assessed_level="kuliah",
+        concept_density=0.5, is_study_material=True, times_seen=0,
+    )
     assert out.accepted
-    assert out.level_factor == 0.6
+    assert out.level_factor == 1.0, (
+        "menantang diri dengan materi lebih tinggi tidak boleh dihukum"
+    )
 
 
 def test_gate_menolak_materi_terlalu_tipis():
@@ -64,12 +69,12 @@ def test_peluruhan_kebaruan():
     assert R.novelty_factor(5) == 0.3
 
 
-def test_celah_yang_dicoba_bersamaan_saling_memperkecil():
+def test_mengulang_materi_yang_sama_memperkecil_reward():
     out = R.evaluate_gate(
-        declared_level="sma", assessed_level="smp",
+        declared_level="sma", assessed_level="sma",
         concept_density=0.4, is_study_material=True, times_seen=2,
     )
-    assert out.combined == pytest.approx(0.6 * 0.3)
+    assert out.combined == pytest.approx(0.3)
 
 
 def test_ambang_bloom_sma_butuh_mayoritas_soal_analitis():

@@ -46,12 +46,7 @@ def level_index(level: str) -> int:
 
 
 def level_factor(declared: str, assessed: str) -> float:
-    gap = level_index(declared) - level_index(assessed)
-    if gap <= 0:
-        return 1.0
-    if gap == 1:
-        return 0.6
-    return 0.0
+    return 1.0 if level_index(declared) <= level_index(assessed) else 0.0
 
 
 def novelty_factor(times_seen: int) -> float:
@@ -88,11 +83,10 @@ def evaluate_gate(
     if lf == 0.0:
         return GateOutcome(
             False, 0.0, nov, times_seen, RejectReason.LEVEL_TOO_LOW,
-            "Materi ini dua tingkat atau lebih di bawah jenjang yang dipilih.",
+            "Materi ini di bawah jenjang yang dipilih, jadi soalnya tidak menguji apa pun.",
         )
 
-    note = "" if lf == 1.0 else "Materi satu tingkat di bawah jenjang, reward disesuaikan."
-    return GateOutcome(True, lf, nov, times_seen, None, note)
+    return GateOutcome(True, lf, nov, times_seen, None, "")
 
 
 def bloom_floor_met(bloom_levels: list[str], academic_level: str) -> bool:
