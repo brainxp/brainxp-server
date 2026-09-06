@@ -112,6 +112,13 @@ def test_soal_per_sesi_dibatasi_sepuluh(spec):
     assert bounds["minimum"] == 1
 
 
+def test_sandi_pendaftaran_minimal_delapan_karakter(spec):
+    field = spec["components"]["schemas"]["RegisterIn"]["properties"]["password"]
+    assert field["minLength"] == 8, (
+        "panjang yang diminta di layar pendaftaran harus sama dengan yang dijaga API"
+    )
+
+
 def test_kode_pemasangan_menyebut_perangkat_yang_sudah_terdaftar(spec):
     schema = spec["components"]["schemas"]["PairingCodeOut"]["properties"]
     assert "bound_device" in schema, (

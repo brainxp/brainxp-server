@@ -1550,7 +1550,7 @@
           },
           "password": {
             "maxLength": 200,
-            "minLength": 10,
+            "minLength": 8,
             "title": "Password",
             "type": "string"
           }
