@@ -5,11 +5,17 @@ from app import queue as Q
 from app.services import pairing as PC
 
 
+def leftmost(source) -> str:
+    while hasattr(source, "left"):
+        source = source.left
+    return getattr(source, "name", "?")
+
+
 def label(statement) -> tuple[str, str]:
     kind = statement.__visit_name__
     if kind == "select":
         froms = statement.get_final_froms()
-        return kind, froms[0].name if froms else "?"
+        return kind, leftmost(froms[0]) if froms else "?"
     return kind, statement.table.name
 
 
@@ -33,6 +39,9 @@ class Reply:
 
     def scalar_one(self):
         return self.rows[0]
+
+    def scalar(self):
+        return self.rows[0] if self.rows else None
 
 
 class Recorder:

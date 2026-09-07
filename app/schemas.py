@@ -315,6 +315,23 @@ class ReportOut(BaseModel):
     device: BoundDeviceOut | None = None
 
 
+AlertKind = Literal[
+    "accessibility_off", "usage_access_off", "overlay_off",
+    "protection_disabled", "device_silent",
+]
+
+
+class AlertOut(BaseModel):
+    id: int
+    subject_id: uuid.UUID
+    subject_name: str
+    kind: AlertKind
+    detail: str | None = None
+    created_at: datetime
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+
+
 class PushTokenIn(BaseModel):
     token: str = Field(min_length=16, max_length=4096)
     platform: Literal["android", "ios", "web"] = "android"

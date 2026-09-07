@@ -292,3 +292,15 @@ push_tokens = Table(
     Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("revoked_at", DateTime(timezone=True)),
 )
+
+guardian_alerts = Table(
+    "guardian_alerts", meta,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("subject_id", _uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False),
+    Column("device_id", _uuid, ForeignKey("devices.id", ondelete="SET NULL")),
+    Column("kind", Text, nullable=False),
+    Column("detail", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("acknowledged_at", DateTime(timezone=True)),
+    Column("resolved_at", DateTime(timezone=True)),
+)

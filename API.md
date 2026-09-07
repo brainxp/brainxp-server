@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 42 operasi pada 37 path.
+Versi 0.1.0. 44 operasi pada 39 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -88,6 +88,13 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `GET /subjects/{subject_id}/progress` | Bearer | — | 200 `ProgressOut` |
 | `GET /subjects/{subject_id}/report` | Bearer | — | 200 `ReportOut` |
 
+## Peringatan pengawas
+
+| Operasi | Auth | Kirim | Terima |
+|---|---|---|---|
+| `GET /alerts` | Bearer | — | 200 `AlertOut[]` |
+| `POST /alerts/{alert_id}/ack` | Bearer | — | 200 `AlertOut` |
+
 ## Operasional
 
 | Operasi | Auth | Kirim | Terima |
@@ -97,6 +104,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 ## Skema
 
 - **AdjustIn** — `direction`, `note`, `seconds`
+- **AlertOut** — `acknowledged_at`?, `created_at`, `detail`?, `id`, `kind`, `resolved_at`?, `subject_id`, `subject_name`
 - **AnswerIn** — `chosen_index`?, `essay_text`?, `question_id`
 - **AnswerSavedOut** — `answered_count`, `question_id`, `total_count`
 - **AnswerStateOut** — `chosen_index`?, `essay_text`?, `question_id`
