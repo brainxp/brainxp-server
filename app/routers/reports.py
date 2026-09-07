@@ -15,6 +15,7 @@ from app.routes import CommitBeforeResponse
 from app.security import now
 from app.services import apps as A
 from app.services import devices as D
+from app.services import guardian as G
 from app.services import progress as PR
 from app.services import rules as R
 
@@ -134,7 +135,7 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
         if subject["kind"] != "personal":
             alerts.append("Belum ada perangkat yang berpasangan.")
     else:
-        if dev["last_heartbeat_at"] and now() - dev["last_heartbeat_at"] > timedelta(minutes=5):
+        if dev["last_heartbeat_at"] and now() - dev["last_heartbeat_at"] > G.HEARTBEAT_GRACE:
             alerts.append("Perangkat berhenti melapor. Saldo dibekukan sampai terhubung kembali.")
         if dev["guardian_status"] == "disabled":
             alerts.append("Pengawas dinonaktifkan di perangkat.")

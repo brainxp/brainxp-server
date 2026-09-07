@@ -26,6 +26,10 @@ Leave `ANTHROPIC_API_KEY` empty and the backend still runs, falling back to a
 stub provider. Handy for walking the whole flow without paying for API calls.
 Check `/health` to see which one is live.
 
+The same goes for `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT`: leave them empty
+and guardian alerts are still raised and readable over the API, they just are
+not pushed to anyone's phone.
+
 For a server there is `deploy/provision.sh` (run once, as root) and
 `deploy/bootstrap.sh` (sets up Garage, migrates, brings everything up).
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
 
 from fastapi import APIRouter
 from sqlalchemy import select
@@ -12,12 +11,13 @@ from app.deps import Conn, Me, authorize_subject, is_proxy
 from app.errors import Conflict, Forbidden
 from app.routes import CommitBeforeResponse
 from app.security import now
+from app.services import guardian as G
 from app.services import ledger as L
 from app.services import rules as R
 
 router = APIRouter(tags=["ledger"], route_class=CommitBeforeResponse)
 
-HEARTBEAT_GRACE = timedelta(minutes=5)
+HEARTBEAT_GRACE = G.HEARTBEAT_GRACE
 
 
 async def _frozen(db, subject_id: uuid.UUID) -> bool:

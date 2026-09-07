@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 40 operasi pada 36 path.
+Versi 0.1.0. 44 operasi pada 39 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -23,6 +23,8 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `POST /devices/check-binding` | — | `BindingCheckIn` | 200 `BindingCheckOut` |
 | `POST /devices/heartbeat` | Bearer | `HeartbeatIn` | 204 |
 | `POST /devices/pair` | — | `PairIn` | 200 `TokenOut` |
+| `DELETE /devices/push-token` | Bearer | `PushTokenIn` | 204 |
+| `POST /devices/push-token` | Bearer | `PushTokenIn` | 204 |
 | `GET /subjects` | Bearer | — | 200 `SubjectOut[]` |
 | `POST /subjects` | Bearer | `ChildIn` | 201 `SubjectOut` |
 | `POST /subjects/self` | Bearer | `SelfSubjectIn` | 201 `SubjectOut` |
@@ -86,6 +88,13 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `GET /subjects/{subject_id}/progress` | Bearer | — | 200 `ProgressOut` |
 | `GET /subjects/{subject_id}/report` | Bearer | — | 200 `ReportOut` |
 
+## Peringatan pengawas
+
+| Operasi | Auth | Kirim | Terima |
+|---|---|---|---|
+| `GET /alerts` | Bearer | — | 200 `AlertOut[]` |
+| `POST /alerts/{alert_id}/ack` | Bearer | — | 200 `AlertOut` |
+
 ## Operasional
 
 | Operasi | Auth | Kirim | Terima |
@@ -95,6 +104,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 ## Skema
 
 - **AdjustIn** — `direction`, `note`, `seconds`
+- **AlertOut** — `acknowledged_at`?, `created_at`, `detail`?, `id`, `kind`, `resolved_at`?, `subject_id`, `subject_name`
 - **AnswerIn** — `chosen_index`?, `essay_text`?, `question_id`
 - **AnswerSavedOut** — `answered_count`, `question_id`, `total_count`
 - **AnswerStateOut** — `chosen_index`?, `essay_text`?, `question_id`
@@ -111,6 +121,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **ChildIn** — `academic_level`?, `display_name`, `question_language`?
 - **ConsumptionIn** — `app_label`, `client_event_id`, `occurred_at`?, `seconds`
 - **DayPointOut** — `consumed_seconds`, `day`, `earned_seconds`
+- **GuardianEventIn** — `at`?, `permission`?, `required`?, `type`
 - **HTTPValidationError** — `detail`?
 - **HeartbeatIn** — `events`?, `guardian_status`
 - **InstalledAppIn** — `is_system`?, `label`, `package`, `version_name`?
@@ -126,6 +137,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **PolicyIn** — `academic_level`?, `allowed_upload_methods`?, `base_reward_seconds`?, `daily_caps`?, `daily_grants`?, `day_reset_hour`?, `essay_ratio`?, `idle_days_allowed`?, `locked_apps`?, `question_language`?, `questions_per_session`?
 - **PolicyOut** — `academic_level`, `allowed_upload_methods`, `base_reward_seconds`, `daily_caps`, `daily_grants`, `day_reset_hour`, `essay_ratio`, `idle_days_allowed`, `locked_apps`, `pending_weaken_at`?, `pending_weaken_payload`?, `question_language`, `questions_per_session`, `subject_id`
 - **ProgressOut** — `badges`, `correct_total`, `essay_passed`, `freeze_tokens`, `sessions`, `streak_current`, `streak_longest`, `subject_id`
+- **PushTokenIn** — `platform`?, `token`
 - **QuestionPublic** — `bloom_level`, `difficulty`, `difficulty_factor`, `id`, `options`?, `ordinal`, `qtype`, `rubric_criteria`?, `source_excerpt`, `stem`, `type_factor`
 - **QuizOut** — `answered_ids`?, `answers`?, `base_reward_seconds`, `level_factor`, `material_id`, `max_reward_seconds`, `novelty_factor`, `questions`, `ready_count`, `session_id`, `status`, `title`, `total_count`
 - **QuizStartIn** — `material_id`

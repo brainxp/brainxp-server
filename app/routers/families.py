@@ -3,9 +3,10 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from sqlalchemy import select
 
+from app import queue as Q
 from app import schemas as S
 from app import tables as T
 from app.deps import Conn, Me, authorize_subject
@@ -20,8 +21,10 @@ from app.security import (
     sha256,
 )
 from app.services import devices as D
+from app.services import guardian as G
 from app.services import pairing as PC
 from app.services import progress as P
+from app.services import push as PU
 from app.services import ratelimit as RL
 
 router = APIRouter(tags=["family"], route_class=CommitBeforeResponse)
@@ -328,18 +331,76 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
     )
 
 
+@router.post("/devices/push-token", status_code=204)
+async def register_push_token(body: S.PushTokenIn, db: Conn, me: Me):
+    if not me.device_id and not me.user_id:
+        raise Forbidden("Sesi ini tidak dapat menerima notifikasi.")
+    await PU.remember(
+        db, token=body.token, platform=body.platform,
+        user_id=me.user_id, device_id=me.device_id,
+    )
+
+
+@router.delete("/devices/push-token", status_code=204)
+async def drop_push_token(body: S.PushTokenIn, db: Conn, me: Me):
+    await PU.forget(db, token=body.token, user_id=me.user_id, device_id=me.device_id)
+
+
+EVENT_LIMIT = 20
+
+
 @router.post("/devices/heartbeat", status_code=204)
-async def heartbeat(body: S.HeartbeatIn, db: Conn, me: Me):
+async def heartbeat(body: S.HeartbeatIn, db: Conn, me: Me, tasks: BackgroundTasks):
     if not me.device_id:
         raise Forbidden("Hanya perangkat berpasangan yang dapat melapor.")
+
+    was = (
+        await db.execute(
+            select(T.devices.c.guardian_status).where(T.devices.c.id == me.device_id)
+        )
+    ).scalar()
     await db.execute(
         T.devices.update().where(T.devices.c.id == me.device_id)
         .values(guardian_status=body.guardian_status, last_heartbeat_at=now())
     )
-    for ev in body.events[:20]:
+    await G.resolve(db, subject_id=me.subject_id, kinds=[G.DEVICE_SILENT])
+
+    raised: list[tuple[int, str, str | None]] = []
+
+    if G.protection_lost(was, body.guardian_status):
+        detail = G.STATUS_DETAILS.get(body.guardian_status)
+        opened = await G.raise_alert(
+            db, subject_id=me.subject_id, kind=G.PROTECTION_DISABLED,
+            detail=detail, device_id=me.device_id,
+        )
+        if opened:
+            raised.append((opened, G.PROTECTION_DISABLED, detail))
+    elif G.protection_regained(was, body.guardian_status):
+        await G.resolve(db, subject_id=me.subject_id, kinds=[G.PROTECTION_DISABLED])
+
+    for ev in body.events[:EVENT_LIMIT]:
         await db.execute(
             T.guardian_events.insert().values(
                 device_id=me.device_id, subject_id=me.subject_id,
-                event_type=str(ev.get("type", "unknown"))[:60], payload=ev,
+                event_type=ev.type[:60], payload=ev.model_dump(mode="json"),
             )
+        )
+        kind = G.PERMISSION_KINDS.get(ev.permission or "")
+        if kind is None:
+            continue
+        if ev.type == G.REVOKED:
+            detail = G.revoked_detail(ev.permission or "")
+            opened = await G.raise_alert(
+                db, subject_id=me.subject_id, kind=kind,
+                detail=detail, device_id=me.device_id,
+            )
+            if opened:
+                raised.append((opened, kind, detail))
+        elif ev.type == G.RESTORED:
+            await G.resolve(db, subject_id=me.subject_id, kinds=[kind])
+
+    for opened, kind, detail in raised:
+        tasks.add_task(
+            Q.enqueue, "guardian_push",
+            subject_id=str(me.subject_id), alert_id=opened, kind=kind, detail=detail,
         )
