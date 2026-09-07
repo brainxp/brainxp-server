@@ -16,11 +16,11 @@ def weak_secret_reason(app_env: str, jwt_secret: str) -> str | None:
     if app_env == "development":
         return None
     if not jwt_secret:
-        return "JWT_SECRET belum diisi."
+        return "JWT_SECRET is not set."
     if jwt_secret.startswith(WEAK_SECRET_PREFIXES):
-        return "JWT_SECRET masih memakai nilai contoh."
+        return "JWT_SECRET still holds an example value."
     if len(jwt_secret) < MIN_JWT_SECRET_LENGTH:
-        return f"JWT_SECRET kurang dari {MIN_JWT_SECRET_LENGTH} karakter."
+        return f"JWT_SECRET is shorter than {MIN_JWT_SECRET_LENGTH} characters."
     return None
 
 

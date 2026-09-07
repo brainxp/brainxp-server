@@ -142,7 +142,7 @@ def _keep(items: list[GeneratedQuestion]) -> list[GeneratedQuestion]:
     for q in items:
         why = _rejection(q)
         if why:
-            log.warning("soal %s dibuang: %s", q.qtype, why)
+            log.warning("dropped a %s question: %s", q.qtype, why)
         else:
             kept.append(q)
     return kept
@@ -191,7 +191,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
             data=raw, media_type=mat["source_type"]
         )
     except Exception as exc:
-        log.exception("normalisasi gagal untuk %s", material_id)
+        log.exception("normalisation failed for %s", material_id)
         return await fail(f"Berkas tidak dapat dibaca: {exc}")
 
     att = Attachment(media_type=media, data=data)
@@ -205,7 +205,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
     try:
         verdict = await llm.validate_material(att=att, declared_level=pol["academic_level"])
     except Exception as exc:
-        log.exception("validasi gagal untuk %s", material_id)
+        log.exception("validation failed for %s", material_id)
         return await fail(f"Materi tidak dapat diperiksa: {exc}")
 
     seen = await times_studied(db, mat["subject_id"], mat["content_sha256"])
@@ -288,7 +288,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
     try:
         stems = await make(first, first_essays, 0, 0, [])
     except Exception as exc:
-        log.exception("batch prioritas gagal untuk %s", material_id)
+        log.exception("priority batch failed for %s", material_id)
         return await fail(f"Soal tidak dapat dibuat: {exc}")
 
     if not stems:
@@ -304,7 +304,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
         try:
             produced += await make(rest, min(rest_essays, rest), 1, len(stems), stems)
         except Exception:
-            log.exception("batch lanjutan gagal untuk %s", material_id)
+            log.exception("follow-up batch failed for %s", material_id)
 
     blooms = [
         r[0] for r in (

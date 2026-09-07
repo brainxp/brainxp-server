@@ -14,7 +14,7 @@ def engine() -> AsyncEngine:
         url = settings().database_url
         if not url:
             raise RuntimeError(
-                "DATABASE_URL belum diisi. Salin .env.example ke .env lalu isi kredensialnya."
+                "DATABASE_URL is not set. Copy .env.example to .env and fill in the credentials."
             )
         _engine = create_async_engine(
             url,

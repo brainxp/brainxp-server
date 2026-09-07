@@ -22,13 +22,13 @@ log = logging.getLogger("brainxp")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     s = settings()
-    log.info("BrainXP API mulai · env=%s · llm=%s", s.app_env,
-             "anthropic" if s.llm_enabled else "tiruan")
-    lemah = weak_secret_reason(s.app_env, s.jwt_secret)
-    if lemah:
-        raise RuntimeError(f"{lemah} Isi dengan 64 karakter acak sebelum menjalankan di produksi.")
+    log.info("BrainXP API up · env=%s · llm=%s", s.app_env,
+             "anthropic" if s.llm_enabled else "stub")
+    weak = weak_secret_reason(s.app_env, s.jwt_secret)
+    if weak:
+        raise RuntimeError(f"{weak} Set it to 64 random characters before running in production.")
     if not s.jwt_secret:
-        log.warning("JWT_SECRET kosong, memakai kunci acak sementara. Token hangus tiap mulai ulang.")
+        log.warning("JWT_SECRET is empty, falling back to a throwaway key. Tokens die on restart.")
     engine()
     yield
     await Q.close()
@@ -49,7 +49,7 @@ async def security_headers(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception:
-        log.exception("galat tak tertangani pada %s %s", request.method, request.url.path)
+        log.exception("unhandled error on %s %s", request.method, request.url.path)
         response = JSONResponse(
             status_code=500,
             content={"detail": {"code": "internal", "message": "Terjadi galat di server."}},

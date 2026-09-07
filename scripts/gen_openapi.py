@@ -135,11 +135,11 @@ def main() -> int:
         else:
             path.write_text(text)
     if check and stale:
-        print("spesifikasi API sudah basi: " + ", ".join(stale))
-        print("jalankan: python scripts/gen_openapi.py")
+        print("API spec is stale: " + ", ".join(stale))
+        print("run: python scripts/gen_openapi.py")
         return 1
     if not check:
-        print(f"ditulis: {SPEC.name}, {DOC.name}")
+        print(f"written: {SPEC.name}, {DOC.name}")
     return 0
 
 
