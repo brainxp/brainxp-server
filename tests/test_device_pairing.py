@@ -1,96 +1,14 @@
 import uuid
 from datetime import timedelta
 
-import pytest
-from sqlalchemy.dialects import postgresql
-
-from app import queue as Q
 from app import schemas as S
 from app.routers import families
 from app.security import now, sha256
 from app.services import devices as D
+from tests.conftest import FakeRequest, Recorder, rendered
 
 INSTALL_BINDING = "install-7f3a9c2b41d5"
 BINDING_HASH = sha256(INSTALL_BINDING)
-
-
-def label(statement) -> tuple[str, str]:
-    kind = statement.__visit_name__
-    if kind == "select":
-        froms = statement.get_final_froms()
-        return kind, froms[0].name if froms else "?"
-    return kind, statement.table.name
-
-
-def rendered(statement) -> str:
-    return str(
-        statement.compile(
-            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
-        )
-    )
-
-
-class Reply:
-    def __init__(self, rows):
-        self.rows = rows
-
-    def mappings(self):
-        return self
-
-    def first(self):
-        return self.rows[0] if self.rows else None
-
-    def all(self):
-        return list(self.rows)
-
-    def scalar_one(self):
-        return self.rows[0]
-
-
-class Recorder:
-    def __init__(self, replies=None):
-        self.replies = replies or {}
-        self.calls: list[tuple[object, object]] = []
-
-    async def execute(self, statement, parameters=None):
-        self.calls.append((statement, parameters))
-        return Reply(self.replies.get(label(statement), []))
-
-    @property
-    def trail(self) -> list[tuple[str, str]]:
-        return [label(s) for s, _ in self.calls]
-
-    def only(self, kind: str, table: str):
-        found = [(s, p) for s, p in self.calls if label(s) == (kind, table)]
-        assert len(found) == 1, f"expected one {kind} on {table}, got {len(found)}"
-        return found[0]
-
-
-class FakeRedis:
-    def __init__(self):
-        self.counts: dict[str, int] = {}
-
-    async def incr(self, key):
-        self.counts[key] = self.counts.get(key, 0) + 1
-        return self.counts[key]
-
-    async def expire(self, key, seconds):
-        return True
-
-
-class FakeRequest:
-    client = None
-
-    def __init__(self):
-        self.headers: dict[str, str] = {}
-
-
-@pytest.fixture(autouse=True)
-def redis_without_a_server(monkeypatch):
-    def client():
-        return FakeRedis()
-
-    monkeypatch.setattr(Q, "redis", client)
 
 
 def live_code(subject_id: uuid.UUID) -> dict:
@@ -154,7 +72,7 @@ async def test_the_phone_is_taken_from_its_previous_owner():
         "would keep minting access tokens"
     )
     forget, _ = db.only("delete", "installed_apps")
-    assert str(previous_owner) in rendered(forget), (
+    assert str(previous_owner) in rendered(forget, literals=True), (
         "the app list belongs to the child the phone was taken from, not to the "
         "child receiving it"
     )
@@ -168,9 +86,8 @@ async def test_nothing_is_written_when_no_device_is_in_the_way():
 
 
 async def test_the_device_in_the_way_is_released_before_the_new_row_is_written():
-    subject = uuid.uuid4()
     db = Recorder({
-        ("select", "pairing_codes"): [live_code(subject)],
+        ("select", "pairing_codes"): [live_code(uuid.uuid4())],
         ("select", "devices"): [{"id": uuid.uuid4(), "subject_id": uuid.uuid4()}],
         ("insert", "devices"): [uuid.uuid4()],
     })
@@ -185,9 +102,8 @@ async def test_the_device_in_the_way_is_released_before_the_new_row_is_written()
 
 
 async def test_the_new_row_carries_the_hash_that_was_searched_for():
-    subject = uuid.uuid4()
     db = Recorder({
-        ("select", "pairing_codes"): [live_code(subject)],
+        ("select", "pairing_codes"): [live_code(uuid.uuid4())],
         ("insert", "devices"): [uuid.uuid4()],
     })
 
@@ -195,19 +111,18 @@ async def test_the_new_row_carries_the_hash_that_was_searched_for():
 
     search, _ = db.only("select", "devices")
     written, _ = db.only("insert", "devices")
-    assert BINDING_HASH in rendered(search)
-    assert BINDING_HASH in rendered(written), (
+    assert BINDING_HASH in rendered(search, literals=True)
+    assert BINDING_HASH in rendered(written, literals=True), (
         "hashing the binding twice invites the two values to drift apart, and then "
         "the search clears a row the insert never collides with"
     )
 
 
 async def test_each_child_who_loses_a_device_gets_told():
-    subject = uuid.uuid4()
     previous_owner = uuid.uuid4()
     old_device, replacement = uuid.uuid4(), uuid.uuid4()
     db = Recorder({
-        ("select", "pairing_codes"): [live_code(subject)],
+        ("select", "pairing_codes"): [live_code(uuid.uuid4())],
         ("select", "devices"): [{"id": old_device, "subject_id": previous_owner}],
         ("insert", "devices"): [replacement],
     })

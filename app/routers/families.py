@@ -20,13 +20,13 @@ from app.security import (
     sha256,
 )
 from app.services import devices as D
+from app.services import pairing as PC
 from app.services import progress as P
 from app.services import ratelimit as RL
 
 router = APIRouter(tags=["family"], route_class=CommitBeforeResponse)
 
 PAIRING_TTL = 600
-PAIRING_MAX_ATTEMPTS = 5
 
 
 async def _my_family(db, me) -> uuid.UUID:
@@ -210,7 +210,7 @@ async def issue_pairing_code(subject_id: uuid.UUID, db: Conn, me: Me):
     )
     return S.PairingCodeOut(
         code=code, subject_id=subject_id, expires_at=expires,
-        attempts_allowed=PAIRING_MAX_ATTEMPTS,
+        attempts_allowed=PC.MAX_ATTEMPTS,
         bound_device=D.as_bound(bound),
     )
 
@@ -268,15 +268,14 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
 
     if not row:
         raise NotFound("Kode tidak dikenal.")
+
+    if PC.burned(await PC.count_attempt(row["code"])):
+        raise Conflict("Kode ini sudah terlalu banyak dicoba. Minta yang baru.", code="code_burned")
+
     if row["consumed_at"] is not None:
         raise Conflict("Kode ini sudah dipakai.", code="code_used")
     if row["expires_at"] <= now():
         raise Conflict("Kode sudah kedaluwarsa. Minta yang baru.", code="code_expired")
-
-    await db.execute(
-        T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])
-        .values(attempt_count=T.pairing_codes.c.attempt_count + 1)
-    )
 
     binding = sha256(body.install_binding)
     displaced = await D.displace(db, row["subject_id"], binding)
