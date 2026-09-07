@@ -114,26 +114,26 @@ def _within_limits(q: GeneratedQuestion) -> bool:
 
 def _rejection(q: GeneratedQuestion) -> str | None:
     if not q.stem.strip() or not q.source_excerpt.strip():
-        return "kosong"
+        return "empty stem or excerpt"
     over = _overflow(q)
     if over:
-        return f"melebihi batas panjang: {over}"
+        return f"over the length limit: {over}"
     if q.qtype == "essay":
         if not q.rubric or not 2 <= len(q.rubric) <= 5:
-            return "rubrik esai tidak lengkap"
+            return "incomplete essay rubric"
         if not (q.reference_answer or "").strip():
-            return "esai tanpa jawaban acuan"
+            return "essay without a reference answer"
         return None
     if not q.options or len(q.options) != 4:
-        return "pilihan ganda bukan empat opsi"
+        return "multiple choice without four options"
     if q.correct_index is None or not 0 <= q.correct_index < 4:
-        return "kunci jawaban di luar jangkauan"
+        return "answer key out of range"
     cleaned = [o.strip().lower() for o in q.options]
     if len(set(cleaned)) != 4 or any(not o for o in cleaned):
-        return "opsi kembar atau kosong"
+        return "duplicate or empty option"
     banned = ("semua benar", "tidak ada yang benar", "all of the above", "none of the above")
     if any(any(b in o for b in banned) for o in cleaned):
-        return "memakai opsi terlarang"
+        return "uses a banned option"
     return None
 
 

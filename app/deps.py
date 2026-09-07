@@ -32,6 +32,10 @@ class Caller:
         return self.role == "child"
 
 
+def _as_uuid(value: str | None) -> uuid.UUID | None:
+    return uuid.UUID(value) if value else None
+
+
 def revoked_reason(device) -> str | None:
     if device is None:
         return "Perangkat ini tidak dikenal lagi."
@@ -58,9 +62,13 @@ async def require_bound_device(db: AsyncConnection, device_id: uuid.UUID) -> Non
 async def caller(db: Conn, authorization: Annotated[str | None, Header()] = None) -> Caller:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise Unauthorized("Header Authorization tidak ada.")
-    c = read_access_token(authorization.split(" ", 1)[1].strip())
-    as_uuid = lambda v: uuid.UUID(v) if v else None  # noqa: E731
-    me = Caller(as_uuid(c.get("uid")), as_uuid(c.get("sid")), c["role"], as_uuid(c.get("did")))
+    claims = read_access_token(authorization.split(" ", 1)[1].strip())
+    me = Caller(
+        _as_uuid(claims.get("uid")),
+        _as_uuid(claims.get("sid")),
+        claims["role"],
+        _as_uuid(claims.get("did")),
+    )
     if me.device_id:
         await require_bound_device(db, me.device_id)
     return me

@@ -3,8 +3,8 @@ import pytest
 from app.errors import Invalid
 from app.services.documents import classify, method_for
 
-FOTO = ["image/jpeg", "image/png", "image/webp"]
-DOKUMEN = [
+IMAGES = ["image/jpeg", "image/png", "image/webp"]
+DOCUMENTS = [
     "application/pdf",
     "text/plain",
     "text/markdown",
@@ -15,19 +15,19 @@ DOKUMEN = [
 ]
 
 
-@pytest.mark.parametrize("media_type", FOTO)
-def test_gambar_selalu_dihitung_sebagai_foto(media_type):
+@pytest.mark.parametrize("media_type", IMAGES)
+def test_an_image_always_counts_as_a_photo(media_type):
     assert method_for(classify(media_type)) == "photo", (
-        "aturan orang tua yang melarang foto tidak boleh bisa dilewati hanya dengan "
-        "memilih gambar lewat tombol kirim dokumen"
+        "a parent's rule banning photos must not be sidestepped by picking the "
+        "image through the send-document button"
     )
 
 
-@pytest.mark.parametrize("media_type", DOKUMEN)
-def test_berkas_selain_gambar_dihitung_sebagai_dokumen(media_type):
+@pytest.mark.parametrize("media_type", DOCUMENTS)
+def test_anything_that_is_not_an_image_counts_as_a_document(media_type):
     assert method_for(classify(media_type)) == "document"
 
 
-def test_jenis_asing_ditolak_sebelum_sempat_dinilai():
+def test_an_unknown_type_is_refused_before_it_can_be_assessed():
     with pytest.raises(Invalid):
         classify("application/x-msdownload")

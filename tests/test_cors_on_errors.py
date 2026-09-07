@@ -11,7 +11,7 @@ ORIGIN = "http://localhost:5173"
 
 
 @pytest.fixture(autouse=True)
-def pulihkan_modul():
+def restore_module():
     yield
     app.config.settings.cache_clear()
     importlib.reload(app.main)
@@ -23,24 +23,24 @@ def build(monkeypatch):
     return importlib.reload(app.main)
 
 
-def test_cors_membungkus_penangan_galat(monkeypatch):
+def test_cors_wraps_the_error_handler(monkeypatch):
     main = build(monkeypatch)
     names = [m.cls for m in main.api.user_middleware]
     assert names[0] is CORSMiddleware, (
-        "CORSMiddleware harus paling luar; kalau tidak, respons 500 keluar tanpa "
-        "header CORS dan browser melaporkannya sebagai masalah CORS"
+        "CORSMiddleware has to sit outermost; otherwise a 500 goes out without CORS "
+        "headers and the browser reports it as a CORS problem"
     )
 
 
-def test_galat_server_tetap_membawa_header_cors(monkeypatch):
+def test_a_server_error_still_carries_cors_headers(monkeypatch):
     main = build(monkeypatch)
 
-    @main.api.get("/__meledak")
-    async def meledak():
-        raise RuntimeError("pura-pura gagal")
+    @main.api.get("/__explode")
+    async def explode():
+        raise RuntimeError("pretend this failed")
 
     client = TestClient(main.api, raise_server_exceptions=False)
-    res = client.get("/__meledak", headers={"Origin": ORIGIN})
+    res = client.get("/__explode", headers={"Origin": ORIGIN})
 
     assert res.status_code == 500
     assert res.headers.get("access-control-allow-origin") == ORIGIN
