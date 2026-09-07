@@ -202,20 +202,23 @@ class AnthropicProvider:
         self._client = AsyncAnthropic(api_key=s.anthropic_api_key or None)
         self._s = s
 
+    async def _ask(self, *, model: str, schema: type[BaseModel], **kw: Any) -> Any:
+        async with self._client.messages.stream(
+            model=model, output_format=schema, **kw
+        ) as stream:
+            return await stream.get_final_message()
+
     async def _parse(self, *, model: str, schema: type[BaseModel], **kw: Any) -> Any:
-        resp = await self._client.messages.parse(model=model, output_format=schema, **kw)
+        resp = await self._ask(model=model, schema=schema, **kw)
 
         if resp.stop_reason == "refusal":
             category = getattr(getattr(resp, "stop_details", None), "category", None)
             log.warning("model %s refused (category=%s), trying the fallback", model, category)
             fallback = self._s.model_fallback
-            if fallback and fallback != model:
-                resp = await self._client.messages.parse(
-                    model=fallback, output_format=schema, **kw
-                )
-                if resp.stop_reason == "refusal":
-                    raise LLMRefused(category)
-            else:
+            if not fallback or fallback == model:
+                raise LLMRefused(category)
+            resp = await self._ask(model=fallback, schema=schema, **kw)
+            if resp.stop_reason == "refusal":
                 raise LLMRefused(category)
 
         return resp.parsed_output
