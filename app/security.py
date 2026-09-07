@@ -56,12 +56,12 @@ def issue_access_token(
         "exp": int((now() + timedelta(seconds=ttl)).timestamp()),
         "typ": "access",
     }
-    return jwt.encode(payload, s.jwt_secret, algorithm="HS256"), ttl
+    return jwt.encode(payload, s.signing_key, algorithm="HS256"), ttl
 
 
 def read_access_token(token: str) -> dict[str, Any]:
     try:
-        claims = jwt.decode(token, settings().jwt_secret, algorithms=["HS256"])
+        claims = jwt.decode(token, settings().signing_key, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
         raise Unauthorized("Token akses sudah kedaluwarsa.") from None
     except jwt.PyJWTError:

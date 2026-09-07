@@ -1,6 +1,27 @@
+import secrets
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+WEAK_SECRET_PREFIXES = ("ganti-", "dev-secret", "changeme")
+MIN_JWT_SECRET_LENGTH = 32
+
+
+@lru_cache
+def ephemeral_signing_key() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def weak_secret_reason(app_env: str, jwt_secret: str) -> str | None:
+    if app_env == "development":
+        return None
+    if not jwt_secret:
+        return "JWT_SECRET belum diisi."
+    if jwt_secret.startswith(WEAK_SECRET_PREFIXES):
+        return "JWT_SECRET masih memakai nilai contoh."
+    if len(jwt_secret) < MIN_JWT_SECRET_LENGTH:
+        return f"JWT_SECRET kurang dari {MIN_JWT_SECRET_LENGTH} karakter."
+    return None
 
 
 class Settings(BaseSettings):
@@ -10,10 +31,10 @@ class Settings(BaseSettings):
     app_tz: str = "Asia/Jakarta"
     cors_origins: str = ""
 
-    database_url: str = "postgresql+asyncpg://brainxp:brainxp@localhost:5432/brainxp"
+    database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
 
-    jwt_secret: str = "dev-secret-jangan-dipakai-di-produksi"
+    jwt_secret: str = ""
     access_ttl_seconds: int = 900
     refresh_ttl_seconds: int = 2_592_000
 
@@ -40,6 +61,10 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    @property
+    def signing_key(self) -> str:
+        return self.jwt_secret or ephemeral_signing_key()
 
 
 @lru_cache
