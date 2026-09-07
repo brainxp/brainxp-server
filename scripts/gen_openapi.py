@@ -21,6 +21,7 @@ TAG_TITLE = {
     "auth": "Autentikasi",
     "family": "Keluarga, subjek, dan perangkat",
     "policy": "Aturan",
+    "apps": "Aplikasi terpasang di perangkat",
     "materials": "Materi",
     "quiz": "Kuis dan penilaian",
     "ledger": "Saldo dan ekonomi waktu",
@@ -28,7 +29,7 @@ TAG_TITLE = {
     "ops": "Operasional",
 }
 
-TAG_ORDER = ["auth", "family", "policy", "materials", "quiz", "ledger", "reports", "ops"]
+TAG_ORDER = ["auth", "family", "policy", "apps", "materials", "quiz", "ledger", "reports", "ops"]
 
 
 def render(spec: dict) -> str:

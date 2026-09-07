@@ -19,6 +19,7 @@ from app.security import (
     now,
     sha256,
 )
+from app.services import apps as A
 from app.services import devices as D
 from app.services import progress as P
 from app.services import ratelimit as RL
@@ -303,6 +304,7 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
         ).all()
     ]
     if replaced:
+        await A.forget(db, row["subject_id"])
         await db.execute(
             T.devices.update().where(T.devices.c.id.in_(replaced)).values(unbound_at=now())
         )

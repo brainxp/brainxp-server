@@ -320,6 +320,58 @@ class HeartbeatIn(BaseModel):
     events: list[dict] = Field(default_factory=list)
 
 
+class AppRef(BaseModel):
+    package: str
+    label: str
+
+
+class InstalledAppIn(BaseModel):
+    package: str = Field(min_length=1, max_length=255)
+    label: str = Field(min_length=1, max_length=120)
+    is_system: bool = False
+    version_name: str | None = Field(default=None, max_length=60)
+
+
+class AppInventoryIn(BaseModel):
+    apps: list[InstalledAppIn] = Field(min_length=1, max_length=1000)
+
+
+class AppSyncOut(BaseModel):
+    first_sync: bool
+    changed: bool
+    present: int
+    installed: list[AppRef]
+    uninstalled: list[AppRef]
+    synced_at: datetime
+
+
+class InstalledAppOut(BaseModel):
+    package: str
+    label: str
+    is_system: bool
+    version_name: str | None = None
+    locked: bool
+    is_new: bool
+    first_seen_at: datetime
+    last_seen_at: datetime
+    removed_at: datetime | None = None
+
+
+class AppChangeOut(BaseModel):
+    occurred_at: datetime
+    installed: list[AppRef]
+    uninstalled: list[AppRef]
+
+
+class AppInventoryOut(BaseModel):
+    subject_id: uuid.UUID
+    synced_at: datetime | None = None
+    total: int
+    locked_count: int
+    apps: list[InstalledAppOut]
+    recent_changes: list[AppChangeOut]
+
+
 class OfflineQuestionOut(BaseModel):
     id: uuid.UUID
     qtype: str

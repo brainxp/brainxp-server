@@ -131,6 +131,169 @@
         "title": "AnswerStateOut",
         "type": "object"
       },
+      "AppChangeOut": {
+        "properties": {
+          "installed": {
+            "items": {
+              "$ref": "#/components/schemas/AppRef"
+            },
+            "title": "Installed",
+            "type": "array"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "uninstalled": {
+            "items": {
+              "$ref": "#/components/schemas/AppRef"
+            },
+            "title": "Uninstalled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "installed",
+          "uninstalled"
+        ],
+        "title": "AppChangeOut",
+        "type": "object"
+      },
+      "AppInventoryIn": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/InstalledAppIn"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Apps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "apps"
+        ],
+        "title": "AppInventoryIn",
+        "type": "object"
+      },
+      "AppInventoryOut": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/InstalledAppOut"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "locked_count": {
+            "title": "Locked Count",
+            "type": "integer"
+          },
+          "recent_changes": {
+            "items": {
+              "$ref": "#/components/schemas/AppChangeOut"
+            },
+            "title": "Recent Changes",
+            "type": "array"
+          },
+          "subject_id": {
+            "format": "uuid",
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "subject_id",
+          "total",
+          "locked_count",
+          "apps",
+          "recent_changes"
+        ],
+        "title": "AppInventoryOut",
+        "type": "object"
+      },
+      "AppRef": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "package": {
+            "title": "Package",
+            "type": "string"
+          }
+        },
+        "required": [
+          "package",
+          "label"
+        ],
+        "title": "AppRef",
+        "type": "object"
+      },
+      "AppSyncOut": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "first_sync": {
+            "title": "First Sync",
+            "type": "boolean"
+          },
+          "installed": {
+            "items": {
+              "$ref": "#/components/schemas/AppRef"
+            },
+            "title": "Installed",
+            "type": "array"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "synced_at": {
+            "format": "date-time",
+            "title": "Synced At",
+            "type": "string"
+          },
+          "uninstalled": {
+            "items": {
+              "$ref": "#/components/schemas/AppRef"
+            },
+            "title": "Uninstalled",
+            "type": "array"
+          }
+        },
+        "required": [
+          "first_sync",
+          "changed",
+          "present",
+          "installed",
+          "uninstalled",
+          "synced_at"
+        ],
+        "title": "AppSyncOut",
+        "type": "object"
+      },
       "BadgeOut": {
         "properties": {
           "code": {
@@ -407,6 +570,113 @@
           "guardian_status"
         ],
         "title": "HeartbeatIn",
+        "type": "object"
+      },
+      "InstalledAppIn": {
+        "properties": {
+          "is_system": {
+            "default": false,
+            "title": "Is System",
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "package": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Package",
+            "type": "string"
+          },
+          "version_name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Name"
+          }
+        },
+        "required": [
+          "package",
+          "label"
+        ],
+        "title": "InstalledAppIn",
+        "type": "object"
+      },
+      "InstalledAppOut": {
+        "properties": {
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "is_new": {
+            "title": "Is New",
+            "type": "boolean"
+          },
+          "is_system": {
+            "title": "Is System",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "package": {
+            "title": "Package",
+            "type": "string"
+          },
+          "removed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed At"
+          },
+          "version_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Name"
+          }
+        },
+        "required": [
+          "package",
+          "label",
+          "is_system",
+          "locked",
+          "is_new",
+          "first_seen_at",
+          "last_seen_at"
+        ],
+        "title": "InstalledAppOut",
         "type": "object"
       },
       "LedgerEntryOut": {
@@ -2089,6 +2359,65 @@
         ]
       }
     },
+    "/devices/apps": {
+      "put": {
+        "operationId": "sync_installed_apps_devices_apps_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppInventoryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Installed Apps",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
     "/devices/check-binding": {
       "post": {
         "operationId": "check_binding_devices_check_binding_post",
@@ -3317,6 +3646,85 @@
         "summary": "Remove Subject",
         "tags": [
           "family"
+        ]
+      }
+    },
+    "/subjects/{subject_id}/apps": {
+      "get": {
+        "operationId": "list_installed_apps_subjects__subject_id__apps_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_system",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include System",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_removed",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Removed",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppInventoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Installed Apps",
+        "tags": [
+          "apps"
         ]
       }
     },
