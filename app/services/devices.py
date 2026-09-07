@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app import schemas as S
 from app import tables as T
 from app.security import now
+from app.services import apps as A
 
 
 async def active(db: AsyncConnection, subject_id: uuid.UUID):
@@ -50,4 +51,5 @@ async def release(db: AsyncConnection, subject_id: uuid.UUID) -> int:
             T.refresh_tokens.c.revoked_at.is_(None),
         ).values(revoked_at=now())
     )
+    await A.forget(db, subject_id)
     return len(ids)

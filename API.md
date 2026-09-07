@@ -1,6 +1,6 @@
 # BrainXP — Spesifikasi API
 
-Versi 0.1.0. 38 operasi pada 34 path.
+Versi 0.1.0. 40 operasi pada 36 path.
 
 Berkas ini dibangkitkan dari kode oleh `scripts/gen_openapi.py`. Jangan disunting langsung — ubah routernya, lalu jalankan skripnya.
 Sumber kebenarannya adalah `openapi.json`; berkas ini hanya versi yang enak dibaca.
@@ -40,6 +40,13 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 | `POST /policies/{subject_id}/locked-apps/{package}` | Bearer | — | 200 `PolicyChangeOut` |
 | `DELETE /policies/{subject_id}/pending` | Bearer | — | 200 `PolicyChangeOut` |
 | `POST /policies/{subject_id}/pending/apply` | Bearer | — | 200 `PolicyChangeOut` |
+
+## Aplikasi terpasang di perangkat
+
+| Operasi | Auth | Kirim | Terima |
+|---|---|---|---|
+| `PUT /devices/apps` | Bearer | `AppInventoryIn` | 200 `AppSyncOut` |
+| `GET /subjects/{subject_id}/apps` | Bearer | — | 200 `AppInventoryOut` |
 
 ## Materi
 
@@ -91,6 +98,11 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **AnswerIn** — `chosen_index`?, `essay_text`?, `question_id`
 - **AnswerSavedOut** — `answered_count`, `question_id`, `total_count`
 - **AnswerStateOut** — `chosen_index`?, `essay_text`?, `question_id`
+- **AppChangeOut** — `installed`, `occurred_at`, `uninstalled`
+- **AppInventoryIn** — `apps`
+- **AppInventoryOut** — `apps`, `locked_count`, `recent_changes`, `subject_id`, `synced_at`?, `total`
+- **AppRef** — `label`, `package`
+- **AppSyncOut** — `changed`, `first_sync`, `installed`, `present`, `synced_at`, `uninstalled`
 - **BadgeOut** — `code`, `earned`, `earned_at`?, `hint`, `name`
 - **BindingCheckIn** — `install_binding`
 - **BindingCheckOut** — `bound`, `family_mode`?, `subject_name`?
@@ -101,6 +113,8 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **DayPointOut** — `consumed_seconds`, `day`, `earned_seconds`
 - **HTTPValidationError** — `detail`?
 - **HeartbeatIn** — `events`?, `guardian_status`
+- **InstalledAppIn** — `is_system`?, `label`, `package`, `version_name`?
+- **InstalledAppOut** — `first_seen_at`, `is_new`, `is_system`, `label`, `last_seen_at`, `locked`, `package`, `removed_at`?, `version_name`?
 - **LedgerEntryOut** — `delta_seconds`, `entry_type`, `note`, `occurred_at`
 - **LoginIn** — `email`, `password`
 - **MaterialAcceptedOut** — `duplicate_of`?, `material_id`, `status`

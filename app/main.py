@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app import queue as Q
 from app.config import settings, weak_secret_reason
 from app.db import dispose, engine
-from app.routers import auth, families, ledger, materials, policies, quizzes, reports
+from app.routers import apps, auth, families, ledger, materials, policies, quizzes, reports
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,5 +74,5 @@ async def health():
     return {"status": "ok", "llm": "anthropic" if settings().llm_enabled else "stub"}
 
 
-for r in (auth, families, policies, materials, quizzes, ledger, reports):
+for r in (auth, families, policies, apps, materials, quizzes, ledger, reports):
     api.include_router(r.router)

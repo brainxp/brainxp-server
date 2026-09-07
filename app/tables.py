@@ -249,6 +249,19 @@ achievements = Table(
     Column("earned_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
+installed_apps = Table(
+    "installed_apps", meta,
+    Column("subject_id", _uuid, ForeignKey("subjects.id", ondelete="CASCADE"), primary_key=True),
+    Column("package", Text, primary_key=True),
+    Column("label", Text, nullable=False),
+    Column("is_system", Boolean, nullable=False, server_default="false"),
+    Column("version_name", Text),
+    Column("device_id", _uuid, ForeignKey("devices.id", ondelete="SET NULL")),
+    Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("removed_at", DateTime(timezone=True)),
+)
+
 guardian_events = Table(
     "guardian_events", meta,
     Column("id", BigInteger, primary_key=True, autoincrement=True),

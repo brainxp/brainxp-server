@@ -13,11 +13,25 @@ from app.deps import Conn, Me, authorize_subject
 from app.routers.ledger import standing as read_standing
 from app.routes import CommitBeforeResponse
 from app.security import now
+from app.services import apps as A
 from app.services import devices as D
 from app.services import progress as PR
 from app.services import rules as R
 
 router = APIRouter(tags=["reports"], route_class=CommitBeforeResponse)
+
+
+NAMES_IN_ALERT = 3
+
+
+def unlocked_new_apps_alert(rows, locked: set[str]) -> str | None:
+    fresh = [r["label"] for r in rows if r["package"] not in locked]
+    if not fresh:
+        return None
+    shown = ", ".join(fresh[:NAMES_IN_ALERT])
+    rest = len(fresh) - NAMES_IN_ALERT
+    tail = f" dan {rest} lainnya" if rest > 0 else ""
+    return f"{len(fresh)} aplikasi baru terpasang dan belum dikunci: {shown}{tail}."
 
 
 @router.get("/subjects/{subject_id}/progress", response_model=S.ProgressOut)
@@ -54,9 +68,11 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
 
     pol = (
         await db.execute(
-            select(T.policies.c.day_reset_hour).where(T.policies.c.subject_id == subject_id)
+            select(T.policies.c.day_reset_hour, T.policies.c.locked_apps)
+            .where(T.policies.c.subject_id == subject_id)
         )
-    ).scalar_one()
+    ).mappings().one()
+    reset_hour = pol["day_reset_hour"]
     tz = settings().app_tz
     window = min(max(days, 1), 30)
 
@@ -73,14 +89,14 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
 
     buckets: dict = {}
     for e in entries:
-        k = R.day_key(e["occurred_at"], reset_hour=pol, tz=tz)
+        k = R.day_key(e["occurred_at"], reset_hour=reset_hour, tz=tz)
         b = buckets.setdefault(k, {"earned": 0, "consumed": 0})
         if e["entry_type"] == "earned":
             b["earned"] += e["delta_seconds"]
         elif e["entry_type"] == "consumed":
             b["consumed"] += -e["delta_seconds"]
 
-    today = R.day_key(now(), reset_hour=pol, tz=tz)
+    today = R.day_key(now(), reset_hour=reset_hour, tz=tz)
     series = []
     for i in range(window - 1, -1, -1):
         d = today - timedelta(days=i)
@@ -122,6 +138,13 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
             alerts.append("Perangkat berhenti melapor. Saldo dibekukan sampai terhubung kembali.")
         if dev["guardian_status"] == "disabled":
             alerts.append("Pengawas dinonaktifkan di perangkat.")
+
+    new_apps = unlocked_new_apps_alert(
+        await A.newly_installed(db, subject_id, now() - timedelta(days=window)),
+        set(pol["locked_apps"] or []),
+    )
+    if new_apps:
+        alerts.append(new_apps)
 
     flags = (
         await db.execute(
