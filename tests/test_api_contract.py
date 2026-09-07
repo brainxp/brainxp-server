@@ -12,33 +12,33 @@ def spec():
     return api.openapi()
 
 
-def test_skema_soal_publik_tidak_punya_tempat_untuk_kunci_jawaban(spec):
+def test_the_public_question_schema_has_no_room_for_the_answer_key(spec):
     props = set(spec["components"]["schemas"]["QuestionPublic"]["properties"])
-    assert not (props & SECRETS), f"QuestionPublic membocorkan {props & SECRETS}"
+    assert not (props & SECRETS), f"QuestionPublic leaks {props & SECRETS}"
 
 
-def test_bank_luring_hanya_mengirim_hmac(spec):
+def test_the_offline_bank_only_sends_an_hmac(spec):
     props = set(spec["components"]["schemas"]["OfflineQuestionOut"]["properties"])
     assert not (props & SECRETS)
     assert "answer_hmac" in props
 
 
-def test_tidak_ada_skema_lain_yang_membocorkan_kunci_jawaban(spec):
+def test_no_other_schema_leaks_the_answer_key(spec):
     leaks = {
         name: set(s.get("properties", {})) & SECRETS
         for name, s in spec["components"]["schemas"].items()
         if name not in ALLOWED and set(s.get("properties", {})) & SECRETS
     }
-    assert not leaks, f"skema membocorkan kunci jawaban: {leaks}"
+    assert not leaks, f"schemas leaking the answer key: {leaks}"
 
 
-def test_rubrik_hanya_dikirim_sebagai_judul_kriteria(spec):
+def test_the_rubric_is_sent_as_criterion_titles_only(spec):
     props = spec["components"]["schemas"]["QuestionPublic"]["properties"]
     assert "rubric_criteria" in props
     assert "rubric" not in props
 
 
-def test_seluruh_endpoint_kuis_membutuhkan_otorisasi(spec):
+def test_every_quiz_endpoint_requires_authorization(spec):
     public = {"/health", "/auth/register", "/auth/login", "/auth/refresh",
               "/devices/pair", "/devices/check-binding"}
     missing = []
@@ -52,82 +52,82 @@ def test_seluruh_endpoint_kuis_membutuhkan_otorisasi(spec):
             )
             if not has_auth:
                 missing.append(f"{verb.upper()} {path}")
-    assert not missing, f"endpoint tanpa header identitas: {missing}"
+    assert not missing, f"endpoints without an identity header: {missing}"
 
 
-def test_semua_endpoint_terdaftar(spec):
+def test_every_endpoint_is_registered(spec):
     assert len(spec["paths"]) >= 30
 
 
-def test_unggah_materi_mengantrekan_pekerjaan_setelah_transaksi_selesai():
+def test_uploading_material_queues_the_job_after_the_transaction_closes():
     import inspect
 
     from app.routers import materials
 
     source = inspect.getsource(materials.upload_material)
     assert "tasks.add_task(Q.enqueue" in source, (
-        "pekerjaan generate harus diantrekan lewat BackgroundTasks; kalau dipanggil "
-        "langsung, worker bisa membacanya sebelum baris materi ter-commit"
+        "the generate job has to be queued through BackgroundTasks; called directly, "
+        "the worker can read it before the material row is committed"
     )
     assert "await Q.enqueue(" not in source
 
 
-def test_orang_tua_punya_jalur_untuk_mengatur_dirinya_sendiri(spec):
+def test_a_parent_has_a_path_to_manage_themselves(spec):
     path = spec["paths"].get("/subjects/self")
-    assert path, "orang tua harus bisa membuat subjek pribadinya sendiri"
+    assert path, "a parent must be able to create their own personal subject"
     schema = path["post"]["responses"]["201"]["content"]["application/json"]["schema"]
     assert schema["$ref"].endswith("/SubjectOut")
 
 
-def test_menjawab_tidak_membocorkan_benar_salah(spec):
+def test_answering_does_not_leak_right_or_wrong(spec):
     body = spec["paths"]["/quizzes/{session_id}/answers"]["post"]
     ref = body["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
     name = ref.rsplit("/", 1)[-1]
     props = set(spec["components"]["schemas"][name]["properties"])
     leaks = props & {"is_correct", "score", "reward_seconds", "correct_index", "explanation"}
     assert not leaks, (
-        f"jawaban dinilai saat dikumpulkan, bukan saat dijawab; {name} membocorkan {leaks}"
+        f"answers are marked on submission, not as they are given; {name} leaks {leaks}"
     )
 
 
-def test_orang_tua_bukan_perantara_untuk_subjeknya_sendiri():
+def test_a_parent_is_not_a_proxy_for_their_own_subject():
     from types import SimpleNamespace
 
     from app.deps import is_proxy
 
     me = SimpleNamespace(is_parent=True, user_id="u1")
-    assert is_proxy(me, {"user_id": "u2"}), "subjek anak tetap dilindungi"
+    assert is_proxy(me, {"user_id": "u2"}), "a child subject stays protected"
     assert not is_proxy(me, {"user_id": "u1"}), (
-        "orang tua yang mengatur dirinya sendiri bukan perantara, jadi tidak "
-        "boleh terkena penjaga privasi yang ditujukan untuk materi anak"
+        "a parent managing themselves is not a proxy, so the privacy guard meant "
+        "for a child's material must not apply to them"
     )
     child = SimpleNamespace(is_parent=False, user_id=None)
     assert not is_proxy(child, {"user_id": None})
 
 
-def test_soal_per_sesi_dibatasi_sepuluh(spec):
+def test_questions_per_session_is_capped_at_ten(spec):
     field = spec["components"]["schemas"]["PolicyIn"]["properties"]["questions_per_session"]
     bounds = next(v for v in field["anyOf"] if v.get("type") == "integer")
-    assert bounds["maximum"] == 10, "batas yang ditampilkan di layar harus dijaga API juga"
+    assert bounds["maximum"] == 10, "the limit shown on screen has to be enforced by the API too"
     assert bounds["minimum"] == 1
 
 
-def test_sandi_pendaftaran_minimal_delapan_karakter(spec):
+def test_a_registration_password_is_at_least_eight_characters(spec):
     field = spec["components"]["schemas"]["RegisterIn"]["properties"]["password"]
     assert field["minLength"] == 8, (
-        "panjang yang diminta di layar pendaftaran harus sama dengan yang dijaga API"
+        "the length asked for on the sign-up screen has to match what the API enforces"
     )
 
 
-def test_kode_pemasangan_menyebut_perangkat_yang_sudah_terdaftar(spec):
+def test_the_pairing_code_names_the_device_already_registered(spec):
     schema = spec["components"]["schemas"]["PairingCodeOut"]["properties"]
     assert "bound_device" in schema, (
-        "orang tua harus tahu ada perangkat lain sebelum menyerahkan kode, karena "
-        "memasangkan yang baru mengeluarkan yang lama"
+        "a parent has to know another device exists before handing over the code, "
+        "because pairing a new one throws the old one out"
     )
 
 
-def test_menghapus_profil_tersedia_dan_tanpa_isi_balasan(spec):
+def test_removing_a_profile_is_available_and_returns_no_body(spec):
     delete = spec["paths"]["/subjects/{subject_id}"].get("delete")
-    assert delete, "orang tua harus bisa menghapus profil anak"
+    assert delete, "a parent must be able to remove a child profile"
     assert "204" in delete["responses"]

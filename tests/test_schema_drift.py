@@ -11,26 +11,26 @@ SQL = "\n".join(p.read_text() for p in MIGRATIONS)
 
 def sql_columns() -> dict[str, set[str]]:
     out: dict[str, set[str]] = {}
-    for m in re.finditer(r"CREATE TABLE (\w+)\s*\((.*?)\n\);", SQL, re.S):
-        name, body = m.group(1), m.group(2)
-        cols: set[str] = set()
+    for match in re.finditer(r"CREATE TABLE (\w+)\s*\((.*?)\n\);", SQL, re.S):
+        name, body = match.group(1), match.group(2)
+        columns: set[str] = set()
         depth = 0
-        line_acc = ""
+        buffer = ""
         for line in body.splitlines():
             stripped = line.strip()
             if not stripped or stripped.startswith("--"):
                 continue
-            line_acc = line_acc + " " + stripped if depth else stripped
+            buffer = buffer + " " + stripped if depth else stripped
             depth += stripped.count("(") - stripped.count(")")
             if depth > 0:
                 continue
-            token = line_acc.split()[0] if line_acc.split() else ""
-            line_acc = ""
+            token = buffer.split()[0] if buffer.split() else ""
+            buffer = ""
             if token.upper() in {"CONSTRAINT", "PRIMARY", "UNIQUE", "FOREIGN", "CHECK"}:
                 continue
             if re.fullmatch(r"[a-z_][a-z0-9_]*", token):
-                cols.add(token)
-        out[name] = cols
+                columns.add(token)
+        out[name] = columns
 
     for table, action, column in re.findall(
         r"ALTER TABLE (\w+)\s+(ADD|DROP) COLUMN (?:IF (?:NOT )?EXISTS )?(\w+)", SQL
@@ -48,21 +48,21 @@ SQL_TABLES = sql_columns()
 PY_TABLES = {name: {c.name for c in t.columns} for name, t in T.meta.tables.items()}
 
 
-def test_ddl_terbaca():
-    assert len(SQL_TABLES) >= 16, f"hanya {len(SQL_TABLES)} tabel terbaca dari DDL"
+def test_the_ddl_can_be_read():
+    assert len(SQL_TABLES) >= 16, f"only {len(SQL_TABLES)} tables read from the DDL"
 
 
 @pytest.mark.parametrize("table", sorted(PY_TABLES))
-def test_setiap_tabel_python_ada_di_ddl(table):
-    assert table in SQL_TABLES, f"tabel '{table}' didefinisikan di Python tetapi tidak di SQL"
+def test_every_python_table_exists_in_the_ddl(table):
+    assert table in SQL_TABLES, f"table '{table}' is defined in Python but not in SQL"
 
 
 @pytest.mark.parametrize("table", sorted(PY_TABLES))
-def test_kolom_python_tidak_menyimpang_dari_ddl(table):
+def test_python_columns_do_not_drift_from_the_ddl(table):
     if table not in SQL_TABLES:
-        pytest.skip("ketiadaan tabel diuji terpisah")
+        pytest.skip("a missing table is covered by its own test")
     extra = PY_TABLES[table] - SQL_TABLES[table]
-    assert not extra, f"{table}: kolom ada di Python tapi tidak di SQL → {sorted(extra)}"
+    assert not extra, f"{table}: columns in Python but not in SQL -> {sorted(extra)}"
 
 
 DELIBERATELY_UNMAPPED = {
@@ -71,25 +71,25 @@ DELIBERATELY_UNMAPPED = {
 
 
 @pytest.mark.parametrize("table", sorted(SQL_TABLES))
-def test_kolom_ddl_tidak_terlewat_di_python(table):
+def test_no_ddl_column_is_missed_in_python(table):
     if table not in PY_TABLES:
-        pytest.skip(f"tabel {table} belum dipetakan di Python")
+        pytest.skip(f"table {table} is not mapped in Python yet")
     missing = {
         c for c in SQL_TABLES[table] - PY_TABLES[table]
         if (table, c) not in DELIBERATELY_UNMAPPED
     }
-    assert not missing, f"{table}: kolom ada di SQL tapi terlewat di Python → {sorted(missing)}"
+    assert not missing, f"{table}: columns in SQL but missed in Python -> {sorted(missing)}"
 
 
-def test_daftar_pengecualian_tidak_basi():
-    for table, col in DELIBERATELY_UNMAPPED:
-        assert col in SQL_TABLES.get(table, set()), f"{table}.{col} sudah tidak ada di SQL"
-        assert col not in PY_TABLES.get(table, set()), (
-            f"{table}.{col} sudah dipetakan di Python — hapus dari daftar pengecualian"
+def test_the_exception_list_is_not_stale():
+    for table, column in DELIBERATELY_UNMAPPED:
+        assert column in SQL_TABLES.get(table, set()), f"{table}.{column} is gone from SQL"
+        assert column not in PY_TABLES.get(table, set()), (
+            f"{table}.{column} is mapped in Python now, drop it from the exception list"
         )
 
 
-def test_ddl_tidak_memakai_tipe_enum():
+def test_the_ddl_uses_no_enum_types():
     assert "AS ENUM" not in SQL.upper(), (
-        "DDL memakai tipe ENUM. Pakai TEXT dengan CHECK agar cocok dengan tables.py."
+        "the DDL uses an ENUM type. Use TEXT with a CHECK so it matches tables.py."
     )
