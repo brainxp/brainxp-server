@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import queue as Q
-from app.config import settings
+from app.config import settings, weak_secret_reason
 from app.db import dispose, engine
 from app.routers import auth, families, ledger, materials, policies, quizzes, reports
 
@@ -24,10 +24,11 @@ async def lifespan(_: FastAPI):
     s = settings()
     log.info("BrainXP API mulai · env=%s · llm=%s", s.app_env,
              "anthropic" if s.llm_enabled else "tiruan")
-    if s.app_env != "development" and s.jwt_secret.startswith("dev-secret"):
-        raise RuntimeError(
-            "JWT_SECRET masih memakai nilai bawaan. Ganti sebelum menjalankan di produksi."
-        )
+    lemah = weak_secret_reason(s.app_env, s.jwt_secret)
+    if lemah:
+        raise RuntimeError(f"{lemah} Isi dengan 64 karakter acak sebelum menjalankan di produksi.")
+    if not s.jwt_secret:
+        log.warning("JWT_SECRET kosong, memakai kunci acak sementara. Token hangus tiap mulai ulang.")
     engine()
     yield
     await Q.close()

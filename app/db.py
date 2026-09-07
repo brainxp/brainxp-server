@@ -11,8 +11,13 @@ _engine: AsyncEngine | None = None
 def engine() -> AsyncEngine:
     global _engine
     if _engine is None:
+        url = settings().database_url
+        if not url:
+            raise RuntimeError(
+                "DATABASE_URL belum diisi. Salin .env.example ke .env lalu isi kredensialnya."
+            )
         _engine = create_async_engine(
-            settings().database_url,
+            url,
             pool_size=10,
             max_overflow=10,
             pool_pre_ping=True,
