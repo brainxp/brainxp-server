@@ -180,6 +180,19 @@ def test_the_watchdog_ignores_phones_it_should_not_report():
     )
 
 
+def test_the_watchdog_raises_one_alert_per_stretch_of_silence():
+    sql = rendered(G.silent_devices(now() - G.HEARTBEAT_SILENCE))
+    assert "NOT (EXISTS" in sql, (
+        "acknowledging lifts the row out of the open index, so without this the "
+        "sweep would raise a fresh alert and push again on its next tick, every "
+        "couple of minutes, to a parent who had already read it"
+    )
+    assert "guardian_alerts.created_at > devices.last_heartbeat_at" in sql, (
+        "the stretch of silence is identified by the last report, so a phone that "
+        "comes back and goes quiet again is a new alert rather than a suppressed one"
+    )
+
+
 async def test_the_watchdog_sweeps_nothing_when_every_phone_is_reporting():
     db = Recorder()
     assert await G.sweep(db) == 0

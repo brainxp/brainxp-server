@@ -145,6 +145,16 @@ async def deliver(
     await PU.prune(db, dead)
 
 
+def already_told(kind: str):
+    return (
+        select(T.guardian_alerts.c.id).where(
+            T.guardian_alerts.c.subject_id == T.devices.c.subject_id,
+            T.guardian_alerts.c.kind == kind,
+            T.guardian_alerts.c.created_at > T.devices.c.last_heartbeat_at,
+        ).exists()
+    )
+
+
 def silent_devices(cutoff: datetime):
     return (
         select(
@@ -156,6 +166,7 @@ def silent_devices(cutoff: datetime):
             T.subjects.c.deleted_at.is_(None),
             T.devices.c.last_heartbeat_at.isnot(None),
             T.devices.c.last_heartbeat_at < cutoff,
+            ~already_told(DEVICE_SILENT),
         )
     )
 
