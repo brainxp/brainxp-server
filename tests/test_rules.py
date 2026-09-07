@@ -251,11 +251,6 @@ def test_the_question_split_follows_the_essay_ratio():
     assert R.session_mix(5, 0.4) == (3, 2)
 
 
-def test_the_priority_batch_never_exceeds_the_question_count():
-    assert R.priority_batch_size(10) == 3
-    assert R.priority_batch_size(2) == 2
-
-
 def test_the_stale_guardian_block_reason_has_a_value_of_its_own():
     assert R.BlockReason.GUARDIAN_STALE == "guardian_stale"
     assert R.BlockReason.GUARDIAN_STALE not in (

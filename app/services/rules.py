@@ -233,5 +233,3 @@ def session_mix(questions: int, essay_ratio: float) -> tuple[int, int]:
     return questions - essays, essays
 
 
-def priority_batch_size(questions: int) -> int:
-    return min(3, questions)

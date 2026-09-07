@@ -33,6 +33,14 @@ class RubricCriterion(BaseModel):
     indicator: str
 
 
+TOKENS_PER_QUESTION = 2000
+TOKENS_OVERHEAD = 2000
+
+
+def generation_token_budget(count: int) -> int:
+    return TOKENS_OVERHEAD + TOKENS_PER_QUESTION * count
+
+
 STEM_MAX = 600
 OPTION_MAX = 300
 EXCERPT_MAX = 500
@@ -104,7 +112,7 @@ class LLMProvider(Protocol):
 
     async def generate_questions(
         self, *, att: Attachment, count: int, essays: int,
-        academic_level: str, language: str, avoid: list[str],
+        academic_level: str, language: str,
     ) -> QuestionBatch: ...
 
     async def grade_essay(
@@ -233,19 +241,13 @@ class AnthropicProvider:
 
     async def generate_questions(
         self, *, att: Attachment, count: int, essays: int,
-        academic_level: str, language: str, avoid: list[str],
+        academic_level: str, language: str,
     ) -> QuestionBatch:
         lang = {"id": "Bahasa Indonesia", "en": "English"}.get(language, language)
-        avoid_txt = ""
-        if avoid:
-            avoid_txt = (
-                "\n\nSoal berikut sudah dibuat pada batch sebelumnya. "
-                "Jangan mengulang gagasan yang sama:\n- " + "\n- ".join(avoid[:20])
-            )
         return await self._parse(
             model=self._s.model_generation,
             schema=QuestionBatch,
-            max_tokens=16000,
+            max_tokens=generation_token_budget(count),
             system=GEN_SYSTEM,
             messages=[{
                 "role": "user",
@@ -258,7 +260,9 @@ class AnthropicProvider:
                         f"{count - essays} pilihan ganda dan {essays} esai. "
                         f"Jumlah esainya wajib {essays}, tidak boleh kurang.\n"
                         f"Jenjang pengguna: {academic_level}.\n"
-                        f"Tulis semua soal dalam {lang}." + avoid_txt
+                        f"Tulis semua soal dalam {lang}.\n"
+                        "Sebarkan tingkat kesulitan dan tingkat Bloom pada seluruh soal, "
+                        "jangan menumpuk pada satu tingkat."
                     )},
                 ],
             }],
@@ -308,7 +312,7 @@ class StubProvider:
 
     async def generate_questions(
         self, *, att: Attachment, count: int, essays: int,
-        academic_level: str, language: str, avoid: list[str],
+        academic_level: str, language: str,
     ) -> QuestionBatch:
         out: list[GeneratedQuestion] = []
         for i in range(count - essays):
