@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 Level = Literal["sd", "smp", "sma", "kuliah", "profesional"]
 
@@ -337,9 +337,18 @@ class PushTokenIn(BaseModel):
     platform: Literal["android", "ios", "web"] = "android"
 
 
+class GuardianEventIn(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: str = Field(min_length=1, max_length=60)
+    permission: str | None = Field(default=None, max_length=60)
+    at: datetime | None = None
+    required: bool = False
+
+
 class HeartbeatIn(BaseModel):
     guardian_status: Literal["ok", "degraded", "disabled", "unknown"]
-    events: list[dict] = Field(default_factory=list)
+    events: list[GuardianEventIn] = Field(default_factory=list)
 
 
 class AppRef(BaseModel):

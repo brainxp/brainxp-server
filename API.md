@@ -121,6 +121,7 @@ Seluruh operasi memakai JSON kecuali unggah materi yang memakai multipart. Otori
 - **ChildIn** — `academic_level`?, `display_name`, `question_language`?
 - **ConsumptionIn** — `app_label`, `client_event_id`, `occurred_at`?, `seconds`
 - **DayPointOut** — `consumed_seconds`, `day`, `earned_seconds`
+- **GuardianEventIn** — `at`?, `permission`?, `required`?, `type`
 - **HTTPValidationError** — `detail`?
 - **HeartbeatIn** — `events`?, `guardian_status`
 - **InstalledAppIn** — `is_system`?, `label`, `package`, `version_name`?

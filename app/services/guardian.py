@@ -37,6 +37,11 @@ PERMISSION_KINDS = {
     "overlay": OVERLAY_OFF,
 }
 
+STATUS_DETAILS = {
+    "degraded": "Sebagian izin pengawas dicabut di ponsel anak.",
+    "disabled": "Pengawas dimatikan di ponsel anak.",
+}
+
 PERMISSION_LABELS = {
     "accessibility": "aksesibilitas",
     "usage_access": "akses penggunaan",
@@ -66,10 +71,6 @@ def protection_lost(previous: str | None, current: str) -> bool:
 
 def protection_regained(previous: str | None, current: str) -> bool:
     return current == "ok" and previous in FAILING
-
-
-def permission_kind(event: dict) -> str | None:
-    return PERMISSION_KINDS.get(str(event.get("permission") or ""))
 
 
 def revoked_detail(permission: str) -> str:

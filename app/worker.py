@@ -9,6 +9,7 @@ import uuid
 from app import queue as Q
 from app import tables as T
 from app.db import dispose, engine
+from app.services import guardian as G
 from app.services.generation import publish
 from app.services.generation import run as run_generation
 
@@ -18,7 +19,26 @@ logging.basicConfig(
 )
 log = logging.getLogger("brainxp.worker")
 
-HANDLERS = {"generate": lambda db, p: run_generation(db, uuid.UUID(p["material_id"]))}
+HANDLERS = {
+    "generate": lambda db, p: run_generation(db, uuid.UUID(p["material_id"])),
+    "guardian_push": lambda db, p: G.deliver(
+        db, subject_id=uuid.UUID(p["subject_id"]), kind=p["kind"],
+        alert_id=p["alert_id"], detail=p.get("detail"),
+    ),
+}
+
+
+async def watch_for_silence(stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            async with engine().begin() as db:
+                raised = await G.sweep(db)
+            if raised:
+                log.info("raised %d silent device alert(s)", raised)
+        except Exception:
+            log.exception("the silence watchdog failed, retrying next tick")
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=G.SWEEP_INTERVAL)
 
 
 async def abandon(job: dict) -> None:
@@ -66,6 +86,8 @@ async def main() -> None:
     if moved:
         log.info("requeued %d job(s) left behind by a previous worker", moved)
 
+    watchdog = asyncio.create_task(watch_for_silence(stop))
+
     log.info("worker ready, waiting for jobs")
     while not stop.is_set():
         try:
@@ -78,6 +100,10 @@ async def main() -> None:
             continue
         raw, job = reserved
         await handle(raw, job)
+
+    watchdog.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await watchdog
 
     log.info("worker stopped")
     await Q.close()
