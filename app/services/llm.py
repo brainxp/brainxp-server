@@ -199,7 +199,7 @@ class AnthropicProvider:
 
         if resp.stop_reason == "refusal":
             category = getattr(getattr(resp, "stop_details", None), "category", None)
-            log.warning("model %s menolak (kategori=%s), mencoba cadangan", model, category)
+            log.warning("model %s refused (category=%s), trying the fallback", model, category)
             fallback = self._s.model_fallback
             if fallback and fallback != model:
                 resp = await self._client.messages.parse(
@@ -363,5 +363,5 @@ def provider() -> LLMProvider:
     global _provider
     if _provider is None:
         _provider = AnthropicProvider() if settings().llm_enabled else StubProvider()
-        log.info("penyedia LLM: %s", type(_provider).__name__)
+        log.info("LLM provider: %s", type(_provider).__name__)
     return _provider

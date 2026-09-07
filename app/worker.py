@@ -34,14 +34,14 @@ async def abandon(job: dict) -> None:
             )
         await publish(uuid.UUID(material_id), {"stage": "failed", "reason": "internal_error"})
     except Exception:
-        log.exception("gagal menandai materi %s sebagai gagal", material_id)
+        log.exception("could not mark material %s as failed", material_id)
 
 
 async def handle(raw: str, job: dict) -> None:
     kind = job.get("kind")
     fn = HANDLERS.get(kind)
     if fn is None:
-        log.error("jenis pekerjaan tidak dikenal: %s", kind)
+        log.error("unknown job kind: %s", kind)
         await Q.acknowledge(raw)
         return
 
@@ -49,7 +49,7 @@ async def handle(raw: str, job: dict) -> None:
         async with engine().begin() as db:
             await fn(db, job)
     except Exception:
-        log.exception("pekerjaan %s gagal: %s", kind, job)
+        log.exception("job %s failed: %s", kind, job)
         await abandon(job)
     finally:
         await Q.acknowledge(raw)
@@ -64,14 +64,14 @@ async def main() -> None:
 
     moved = await Q.requeue_stale()
     if moved:
-        log.info("mengembalikan %d pekerjaan yang tertinggal dari worker sebelumnya", moved)
+        log.info("requeued %d job(s) left behind by a previous worker", moved)
 
-    log.info("worker siap, menunggu pekerjaan")
+    log.info("worker ready, waiting for jobs")
     while not stop.is_set():
         try:
             reserved = await Q.reserve(timeout=5)
         except Exception:
-            log.exception("gagal membaca antrean, mencoba lagi")
+            log.exception("could not read the queue, retrying")
             await asyncio.sleep(3)
             continue
         if reserved is None:
@@ -79,7 +79,7 @@ async def main() -> None:
         raw, job = reserved
         await handle(raw, job)
 
-    log.info("worker berhenti")
+    log.info("worker stopped")
     await Q.close()
     await dispose()
 

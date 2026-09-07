@@ -36,25 +36,25 @@ async def pending(conn) -> list[Path]:
 async def run() -> int:
     files = sorted(MIGRATIONS.glob("*.sql"))
     if not files:
-        log.error("tidak ada berkas migrasi di %s", MIGRATIONS)
+        log.error("no migration files in %s", MIGRATIONS)
         return 1
 
     async with engine().begin() as conn:
         todo = await pending(conn)
 
     if not todo:
-        log.info("basis data sudah mutakhir, %d migrasi terpasang", len(files))
+        log.info("database already up to date, %d migration(s) applied", len(files))
         return 0
 
     for path in todo:
-        log.info("menerapkan %s", path.name)
+        log.info("applying %s", path.name)
         async with engine().begin() as conn:
             await run_script(conn, path.read_text())
             await conn.execute(
                 text("INSERT INTO schema_migrations (filename) VALUES (:f)"),
                 {"f": path.name},
             )
-    log.info("selesai, %d migrasi diterapkan", len(todo))
+    log.info("done, %d migration(s) applied", len(todo))
     return 0
 
 
@@ -62,9 +62,9 @@ async def status() -> int:
     async with engine().begin() as conn:
         todo = await pending(conn)
     if todo:
-        log.warning("migrasi tertunda: %s", ", ".join(p.name for p in todo))
+        log.warning("pending migrations: %s", ", ".join(p.name for p in todo))
         return 1
-    log.info("basis data mutakhir")
+    log.info("database up to date")
     return 0
 
 
