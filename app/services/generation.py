@@ -69,13 +69,12 @@ async def near_duplicate_penalty(
     return hits
 
 
-def _rows_for(qs_id: uuid.UUID, items: list[GeneratedQuestion], start: int, batch: int) -> list[dict]:
+def _rows_for(qs_id: uuid.UUID, items: list[GeneratedQuestion]) -> list[dict]:
     out = []
     for i, q in enumerate(items):
         out.append({
             "question_set_id": qs_id,
-            "batch_index": batch,
-            "ordinal": start + i,
+            "ordinal": i,
             "qtype": q.qtype,
             "stem": q.stem,
             "options": q.options,
@@ -252,8 +251,6 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
 
     want = int(pol["questions_per_session"])
     _, essays = R.session_mix(want, float(pol["essay_ratio"]))
-    first = R.priority_batch_size(want)
-    first_essays = 1 if essays and first >= 3 else 0
 
     qs_id = (
         await db.execute(
@@ -267,44 +264,27 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
         )
     ).scalar_one()
 
-    async def make(count: int, ess: int, batch: int, start: int, avoid: list[str]) -> list[str]:
-        result = await llm.generate_questions(
-            att=att, count=count, essays=ess,
+    try:
+        batch = await llm.generate_questions(
+            att=att, count=want, essays=essays,
             academic_level=pol["academic_level"],
             language=pol["question_language"],
-            avoid=avoid,
         )
-        good = _dedupe(_keep(result.questions))
-        if not good:
-            return []
-        rows = _rows_for(qs_id, good, start, batch)
-        await db.execute(T.questions.insert(), rows)
-        await db.execute(
-            T.question_sets.update().where(T.question_sets.c.id == qs_id)
-            .values(ready_count=T.question_sets.c.ready_count + len(good))
-        )
-        return [q.stem for q in good]
-
-    try:
-        stems = await make(first, first_essays, 0, 0, [])
     except Exception as exc:
-        log.exception("priority batch failed for %s", material_id)
+        log.exception("generation failed for %s", material_id)
         return await fail(f"Soal tidak dapat dibuat: {exc}")
 
-    if not stems:
+    kept = _dedupe(_keep(batch.questions))
+    if not kept:
         return await fail("Tidak ada soal yang lolos validasi dari materi ini.")
 
-    await publish(material_id, {"stage": "partial", "ready": len(stems),
+    await db.execute(T.questions.insert(), _rows_for(qs_id, kept))
+    await db.execute(
+        T.question_sets.update().where(T.question_sets.c.id == qs_id)
+        .values(ready_count=len(kept))
+    )
+    await publish(material_id, {"stage": "partial", "ready": len(kept),
                                 "question_set_id": str(qs_id), "total": want})
-
-    rest = want - len(stems)
-    rest_essays = max(0, essays - first_essays)
-    produced = list(stems)
-    if rest > 0:
-        try:
-            produced += await make(rest, min(rest_essays, rest), 1, len(stems), stems)
-        except Exception:
-            log.exception("follow-up batch failed for %s", material_id)
 
     blooms = [
         r[0] for r in (
@@ -316,7 +296,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
     ]
     floor_ok = R.bloom_floor_met(blooms, pol["academic_level"])
 
-    ready = len(produced)
+    ready = len(kept)
     status = "complete" if ready >= want else "degraded"
     await db.execute(
         T.question_sets.update().where(T.question_sets.c.id == qs_id).values(status=status)
