@@ -49,7 +49,9 @@ async def list_subjects(db: Conn, me: Me):
     if me.role in ("child", "personal"):
         rows = (
             await db.execute(
-                select(T.subjects).where(T.subjects.c.id == me.subject_id)
+                select(T.subjects).where(
+                    T.subjects.c.id == me.subject_id, T.subjects.c.deleted_at.is_(None)
+                )
             )
         ).mappings().all()
     else:
