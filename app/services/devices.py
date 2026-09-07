@@ -10,6 +10,7 @@ from app import schemas as S
 from app import tables as T
 from app.security import now
 from app.services import apps as A
+from app.services import push as PU
 
 REPLACED_EVENT = "device_replaced"
 
@@ -54,6 +55,7 @@ async def _unbind(db: AsyncConnection, rows: Sequence) -> None:
             T.refresh_tokens.c.revoked_at.is_(None),
         ).values(revoked_at=now())
     )
+    await PU.revoke_devices(db, ids)
     for subject_id in {r["subject_id"] for r in rows}:
         await A.forget(db, subject_id)
 

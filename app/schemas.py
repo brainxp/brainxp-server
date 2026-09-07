@@ -315,6 +315,11 @@ class ReportOut(BaseModel):
     device: BoundDeviceOut | None = None
 
 
+class PushTokenIn(BaseModel):
+    token: str = Field(min_length=16, max_length=4096)
+    platform: Literal["android", "ios", "web"] = "android"
+
+
 class HeartbeatIn(BaseModel):
     guardian_status: Literal["ok", "degraded", "disabled", "unknown"]
     events: list[dict] = Field(default_factory=list)

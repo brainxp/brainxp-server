@@ -22,6 +22,7 @@ from app.security import (
 from app.services import devices as D
 from app.services import pairing as PC
 from app.services import progress as P
+from app.services import push as PU
 from app.services import ratelimit as RL
 
 router = APIRouter(tags=["family"], route_class=CommitBeforeResponse)
@@ -326,6 +327,21 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
         access_token=access, refresh_token=raw, expires_in=ttl, role="child",
         subject_id=row["subject_id"], device_secret=secret_raw,
     )
+
+
+@router.post("/devices/push-token", status_code=204)
+async def register_push_token(body: S.PushTokenIn, db: Conn, me: Me):
+    if not me.device_id and not me.user_id:
+        raise Forbidden("Sesi ini tidak dapat menerima notifikasi.")
+    await PU.remember(
+        db, token=body.token, platform=body.platform,
+        user_id=me.user_id, device_id=me.device_id,
+    )
+
+
+@router.delete("/devices/push-token", status_code=204)
+async def drop_push_token(body: S.PushTokenIn, db: Conn, me: Me):
+    await PU.forget(db, token=body.token, user_id=me.user_id, device_id=me.device_id)
 
 
 @router.post("/devices/heartbeat", status_code=204)

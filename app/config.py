@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     s3_region: str = "auto"
     signed_url_ttl_seconds: int = 300
 
+    fcm_project_id: str = ""
+    fcm_service_account: str = ""
+
     max_upload_bytes: int = 33_554_432
     daily_upload_quota: int = 20
 
@@ -61,6 +64,10 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.anthropic_api_key)
+
+    @property
+    def push_enabled(self) -> bool:
+        return bool(self.fcm_project_id and self.fcm_service_account)
 
     @property
     def signing_key(self) -> str:
