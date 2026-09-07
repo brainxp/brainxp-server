@@ -19,7 +19,6 @@ from app.security import (
     now,
     sha256,
 )
-from app.services import apps as A
 from app.services import devices as D
 from app.services import progress as P
 from app.services import ratelimit as RL
@@ -279,13 +278,16 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
         .values(attempt_count=T.pairing_codes.c.attempt_count + 1)
     )
 
+    binding = sha256(body.install_binding)
+    displaced = await D.displace(db, row["subject_id"], binding)
+
     secret_raw, secret_hash = new_device_secret()
     device_id = (
         await db.execute(
             T.devices.insert().values(
                 subject_id=row["subject_id"],
                 device_secret_hash=secret_hash,
-                install_binding_hash=sha256(body.install_binding),
+                install_binding_hash=binding,
                 platform=body.platform,
                 model_name=body.model_name,
                 guardian_status="unknown",
@@ -294,35 +296,7 @@ async def pair_device(body: S.PairIn, db: Conn, request: Request):
         )
     ).scalar_one()
 
-    replaced = [
-        r[0] for r in (
-            await db.execute(
-                select(T.devices.c.id).where(
-                    T.devices.c.subject_id == row["subject_id"],
-                    T.devices.c.id != device_id,
-                    T.devices.c.unbound_at.is_(None),
-                )
-            )
-        ).all()
-    ]
-    if replaced:
-        await A.forget(db, row["subject_id"])
-        await db.execute(
-            T.devices.update().where(T.devices.c.id.in_(replaced)).values(unbound_at=now())
-        )
-        await db.execute(
-            T.refresh_tokens.update().where(
-                T.refresh_tokens.c.device_id.in_(replaced),
-                T.refresh_tokens.c.revoked_at.is_(None),
-            ).values(revoked_at=now())
-        )
-        await db.execute(
-            T.guardian_events.insert().values(
-                subject_id=row["subject_id"], device_id=device_id,
-                event_type="device_replaced",
-                payload={"unbound": [str(d) for d in replaced]},
-            )
-        )
+    await D.announce_replacement(db, displaced, device_id)
 
     await db.execute(
         T.pairing_codes.update().where(T.pairing_codes.c.code == row["code"])

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app import schemas as S
 from app import tables as T
 from app.security import now
 from app.services import apps as A
+
+REPLACED_EVENT = "device_replaced"
 
 
 async def active(db: AsyncConnection, subject_id: uuid.UUID):
@@ -30,18 +33,18 @@ def as_bound(row) -> S.BoundDeviceOut | None:
     )
 
 
-async def release(db: AsyncConnection, subject_id: uuid.UUID) -> int:
-    ids = [
-        r[0] for r in (
-            await db.execute(
-                select(T.devices.c.id).where(
-                    T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
-                )
-            )
-        ).all()
-    ]
-    if not ids:
-        return 0
+def conflicting(subject_id: uuid.UUID, install_binding_hash: str):
+    return select(T.devices.c.id, T.devices.c.subject_id).where(
+        T.devices.c.unbound_at.is_(None),
+        or_(
+            T.devices.c.subject_id == subject_id,
+            T.devices.c.install_binding_hash == install_binding_hash,
+        ),
+    )
+
+
+async def _unbind(db: AsyncConnection, rows: Sequence) -> None:
+    ids = [r["id"] for r in rows]
     await db.execute(
         T.devices.update().where(T.devices.c.id.in_(ids)).values(unbound_at=now())
     )
@@ -51,5 +54,46 @@ async def release(db: AsyncConnection, subject_id: uuid.UUID) -> int:
             T.refresh_tokens.c.revoked_at.is_(None),
         ).values(revoked_at=now())
     )
-    await A.forget(db, subject_id)
-    return len(ids)
+    for subject_id in {r["subject_id"] for r in rows}:
+        await A.forget(db, subject_id)
+
+
+async def displace(
+    db: AsyncConnection, subject_id: uuid.UUID, install_binding_hash: str
+) -> Sequence:
+    rows = (
+        await db.execute(conflicting(subject_id, install_binding_hash))
+    ).mappings().all()
+    if rows:
+        await _unbind(db, rows)
+    return rows
+
+
+async def announce_replacement(db: AsyncConnection, displaced: Sequence, device_id: uuid.UUID) -> None:
+    if not displaced:
+        return
+    await db.execute(
+        T.guardian_events.insert(),
+        [
+            {
+                "subject_id": r["subject_id"], "device_id": r["id"],
+                "event_type": REPLACED_EVENT,
+                "payload": {"replaced_by": str(device_id)},
+            }
+            for r in displaced
+        ],
+    )
+
+
+async def release(db: AsyncConnection, subject_id: uuid.UUID) -> int:
+    rows = (
+        await db.execute(
+            select(T.devices.c.id, T.devices.c.subject_id).where(
+                T.devices.c.subject_id == subject_id, T.devices.c.unbound_at.is_(None)
+            )
+        )
+    ).mappings().all()
+    if not rows:
+        return 0
+    await _unbind(db, rows)
+    return len(rows)
