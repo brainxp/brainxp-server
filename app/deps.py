@@ -32,12 +32,38 @@ class Caller:
         return self.role == "child"
 
 
-async def caller(authorization: Annotated[str | None, Header()] = None) -> Caller:
+def revoked_reason(device) -> str | None:
+    if device is None:
+        return "Perangkat ini tidak dikenal lagi."
+    if device["unbound_at"] is not None:
+        return "Perangkat ini sudah dikeluarkan. Pasangkan ulang untuk melanjutkan."
+    if device["deleted_at"] is not None:
+        return "Profil ini sudah dihapus."
+    return None
+
+
+async def require_bound_device(db: AsyncConnection, device_id: uuid.UUID) -> None:
+    device = (
+        await db.execute(
+            select(T.devices.c.unbound_at, T.subjects.c.deleted_at)
+            .join(T.subjects, T.subjects.c.id == T.devices.c.subject_id, isouter=True)
+            .where(T.devices.c.id == device_id)
+        )
+    ).mappings().first()
+    reason = revoked_reason(device)
+    if reason:
+        raise Unauthorized(reason)
+
+
+async def caller(db: Conn, authorization: Annotated[str | None, Header()] = None) -> Caller:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise Unauthorized("Header Authorization tidak ada.")
     c = read_access_token(authorization.split(" ", 1)[1].strip())
     as_uuid = lambda v: uuid.UUID(v) if v else None  # noqa: E731
-    return Caller(as_uuid(c.get("uid")), as_uuid(c.get("sid")), c["role"], as_uuid(c.get("did")))
+    me = Caller(as_uuid(c.get("uid")), as_uuid(c.get("sid")), c["role"], as_uuid(c.get("did")))
+    if me.device_id:
+        await require_bound_device(db, me.device_id)
+    return me
 
 
 Me = Annotated[Caller, Depends(caller)]
