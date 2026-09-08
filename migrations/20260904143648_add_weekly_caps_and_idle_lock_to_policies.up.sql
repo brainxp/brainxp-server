@@ -18,8 +18,3 @@ ALTER TABLE policies ALTER COLUMN daily_grants SET DEFAULT '[0,0,0,0,0,0,0]'::js
 ALTER TABLE policies DROP COLUMN daily_cap_seconds;
 ALTER TABLE policies DROP COLUMN balance_ceiling_seconds;
 ALTER TABLE policies DROP COLUMN initial_grant_seconds;
-
-ALTER TABLE daily_usage ADD COLUMN granted_at TIMESTAMPTZ;
-
-ALTER TABLE quiz_sessions DROP COLUMN overflow_points;
-ALTER TABLE progress DROP COLUMN points;

@@ -5,7 +5,7 @@ import pytest
 
 from app import tables as T
 
-MIGRATIONS = sorted((Path(__file__).resolve().parents[1] / "migrations").glob("*.sql"))
+MIGRATIONS = sorted((Path(__file__).resolve().parents[1] / "migrations").glob("*.up.sql"))
 SQL = "\n".join(p.read_text() for p in MIGRATIONS)
 
 
