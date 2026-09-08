@@ -11,6 +11,7 @@ SECRET_FIELDS = [
     "jwt_secret",
     "database_url",
     "anthropic_api_key",
+    "openrouter_api_key",
     "s3_access_key",
     "s3_secret_key",
 ]

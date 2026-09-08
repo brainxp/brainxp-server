@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     refresh_ttl_seconds: int = 2_592_000
 
     anthropic_api_key: str = ""
+    openrouter_api_key: str = ""
     model_generation: str = "claude-opus-5"
     model_grading: str = "claude-opus-5"
     model_gate: str = "claude-haiku-4-5"
@@ -62,8 +63,17 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
+    def llm_backends(self) -> list[str]:
+        keys = (("anthropic", self.anthropic_api_key), ("openrouter", self.openrouter_api_key))
+        return [name for name, key in keys if key]
+
+    @property
     def llm_enabled(self) -> bool:
-        return bool(self.anthropic_api_key)
+        return bool(self.llm_backends)
+
+    @property
+    def llm_label(self) -> str:
+        return "+".join(self.llm_backends) or "stub"
 
     @property
     def push_enabled(self) -> bool:
