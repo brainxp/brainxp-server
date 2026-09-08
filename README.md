@@ -29,6 +29,9 @@ its `anthropic/` prefix. Leave both empty and the backend still runs on a stub
 provider, handy for walking the whole flow without paying for API calls.
 Check `/health` to see which one is live.
 
+On the server, `OPENROUTER_API_KEY` is written into `.env` by every deploy from
+the GitHub secret of the same name, so it never has to be typed in by hand.
+
 The same goes for `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT`: leave them empty
 and guardian alerts are still raised and readable over the API, they just are
 not pushed to anyone's phone.
