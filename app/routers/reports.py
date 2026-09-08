@@ -133,12 +133,12 @@ async def report(subject_id: uuid.UUID, db: Conn, me: Me, days: int = 7):
     ).mappings().first()
     if not dev:
         if subject["kind"] != "personal":
-            alerts.append("Belum ada perangkat yang berpasangan.")
+            alerts.append("Belum ada ponsel yang dipasangkan.")
     else:
         if dev["last_heartbeat_at"] and now() - dev["last_heartbeat_at"] > G.HEARTBEAT_GRACE:
-            alerts.append("Perangkat berhenti melapor. Saldo dibekukan sampai terhubung kembali.")
+            alerts.append("Ponselnya tidak terhubung. Saldo waktunya dibekukan sampai tersambung lagi.")
         if dev["guardian_status"] == "disabled":
-            alerts.append("Pengawas dinonaktifkan di perangkat.")
+            alerts.append("BrainXP dimatikan di ponselnya.")
 
     new_apps = unlocked_new_apps_alert(
         await A.newly_installed(db, subject_id, now() - timedelta(days=window)),
