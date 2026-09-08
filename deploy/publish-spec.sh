@@ -16,11 +16,11 @@ else
   echo "Kesegarannya dijaga CI lewat tests/test_openapi_current.py."
 fi
 
-[[ -f openapi.json && -f API.md ]] || { echo "openapi.json atau API.md tidak ada."; exit 1; }
+[[ -f openapi.json ]] || { echo "openapi.json tidak ada."; exit 1; }
 
 sudo install -d -m 755 "$TARGET"
 sudo install -m 644 openapi.json "$TARGET/openapi.json"
-sudo install -m 644 API.md "$TARGET/API.md"
+sudo rm -f "$TARGET/API.md"
 sudo install -m 644 deploy/spec/index.html "$TARGET/index.html"
 sudo install -m 644 deploy/spec/favicon.svg "$TARGET/favicon.svg"
 

@@ -1,8 +1,8 @@
 import json
 
-from scripts.gen_openapi import DOC, SPEC, build
+from scripts.gen_openapi import SPEC, build
 
-CURRENT_SPEC, CURRENT_DOC = build()
+CURRENT_SPEC, _ = build()
 COMMAND = "python scripts/gen_openapi.py"
 
 
@@ -10,18 +10,10 @@ def test_openapi_json_exists():
     assert SPEC.exists(), f"openapi.json has not been generated. Run: {COMMAND}"
 
 
-def test_api_md_exists():
-    assert DOC.exists(), f"API.md has not been generated. Run: {COMMAND}"
-
-
 def test_openapi_json_is_not_stale():
     assert SPEC.read_text() == CURRENT_SPEC, (
         f"openapi.json does not match the code. Run: {COMMAND}"
     )
-
-
-def test_api_md_is_not_stale():
-    assert DOC.read_text() == CURRENT_DOC, f"API.md does not match the code. Run: {COMMAND}"
 
 
 def test_the_stored_spec_parses():

@@ -80,8 +80,9 @@ If you change the API, regenerate the spec:
 python scripts/gen_openapi.py
 ```
 
-`openapi.json` and `API.md` are built from the source. A test fails when either
-one drifts from the routers.
+`openapi.json` and `API.md` are built from the source. Only `openapi.json` is
+committed; a test fails when it drifts from the routers. `API.md` is a local
+copy for reading and stays out of git.
 
 ## Branches
 
