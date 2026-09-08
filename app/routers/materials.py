@@ -75,7 +75,7 @@ async def upload_material(
     me: Me,
     tasks: BackgroundTasks,
     request: Request,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(..., alias="file"),
 ):
     await authorize_subject(db, me, subject_id)
     s = settings()
@@ -90,7 +90,7 @@ async def upload_material(
         await db.execute(select(T.policies).where(T.policies.c.subject_id == subject_id))
     ).mappings().one()
 
-    method = documents.method_for(documents.classify(file.content_type or ""))
+    method = documents.batch_method([f.content_type or "" for f in files])
     if method not in (pol["allowed_upload_methods"] or []):
         raise Forbidden(
             "Menyetor lewat foto belum diizinkan oleh aturan."
@@ -98,10 +98,10 @@ async def upload_material(
             else "Menyetor lewat dokumen belum diizinkan oleh aturan."
         )
 
-    data = await file.read()
-    if not data:
+    parts = [await f.read() for f in files]
+    if any(not part for part in parts):
         raise Invalid("Berkas kosong.")
-    documents.guard_size(data, s.max_upload_bytes)
+    documents.guard_size(sum(len(part) for part in parts), s.max_upload_bytes)
 
     st = await L.standing(db, subject_id)
     hits = await Q.upload_quota_hit(str(subject_id), st.day.isoformat())
@@ -110,7 +110,7 @@ async def upload_material(
             f"Kuota unggah hari ini ({s.daily_upload_quota} materi) sudah terpakai."
         )
 
-    digest = documents.sha256_bytes(data)
+    digest = documents.content_digest(parts)
 
     twin = (
         await db.execute(
@@ -127,15 +127,27 @@ async def upload_material(
             material_id=twin["id"], status="ready", duplicate_of=twin["id"]
         )
 
+    if len(parts) > 1:
+        data = await documents.photos_to_pdf(parts)
+        documents.guard_size(len(data), s.max_upload_bytes)
+        media_type = "application/pdf"
+        original_name = f"{files[0].filename or 'foto'} (+{len(parts) - 1} foto)"
+        leaf = "materi.pdf"
+    else:
+        data = parts[0]
+        media_type = files[0].content_type or "application/octet-stream"
+        original_name = files[0].filename
+        leaf = files[0].filename or "materi"
+
     material_id = uuid.uuid4()
-    key = f"{subject_id}/{material_id}/{file.filename or 'materi'}"
-    await storage.put(key, data, file.content_type or "application/octet-stream")
+    key = f"{subject_id}/{material_id}/{leaf}"
+    await storage.put(key, data, media_type)
 
     await db.execute(
         T.materials.insert().values(
             id=material_id, subject_id=subject_id,
-            source_type=(file.content_type or "").split(";")[0],
-            original_name=file.filename, content_sha256=digest,
+            source_type=media_type.split(";")[0],
+            original_name=original_name, content_sha256=digest,
             byte_size=len(data), page_count=documents.pdf_page_count(data),
             storage_key=key, status="uploaded",
             declared_level=pol["academic_level"],

@@ -66,6 +66,14 @@ The essay marker never sees the source material, only the rubric and the
 student's answer. The rubric is frozen when the question is written, long
 before any answer exists.
 
+A handout photographed page by page is one material, not one per page. The
+upload endpoint takes several parts named `file`; more than one has to be
+photos, and they are stitched into a single PDF before anything else touches
+them. So six photos give one question set and one quiz session, and a question
+can reason across pages. Each page is turned upright from its EXIF orientation
+and scaled to the model's vision limit, which is why the merged PDF usually
+comes out smaller than the photos that went in.
+
 Migrations are append-only. Add a new
 `migrations/<YYYYMMDDHHMMSS>_<verb>_<what>.up.sql` together with its `.down.sql`;
 a `create_` file makes exactly one table. Never edit one that has already run.

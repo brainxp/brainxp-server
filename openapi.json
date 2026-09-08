@@ -456,9 +456,12 @@
       "Body_upload_material_subjects__subject_id__materials_post": {
         "properties": {
           "file": {
-            "contentMediaType": "application/octet-stream",
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
             "title": "File",
-            "type": "string"
+            "type": "array"
           }
         },
         "required": [
