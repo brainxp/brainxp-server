@@ -9,7 +9,6 @@ venv/
 
 *.md
 !README.md
-!API.md
 deploy/garage.toml
 
 .DS_Store

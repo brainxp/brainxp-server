@@ -128,20 +128,15 @@ def build() -> tuple[str, str]:
 
 def main() -> int:
     spec_text, doc_text = build()
-    check = "--check" in sys.argv
-    stale = []
-    for path, text in ((SPEC, spec_text), (DOC, doc_text)):
-        if check:
-            if not path.exists() or path.read_text() != text:
-                stale.append(path.name)
-        else:
-            path.write_text(text)
-    if check and stale:
-        print("API spec is stale: " + ", ".join(stale))
+    if "--check" in sys.argv:
+        if SPEC.exists() and SPEC.read_text() == spec_text:
+            return 0
+        print(f"API spec is stale: {SPEC.name}")
         print("run: python scripts/gen_openapi.py")
         return 1
-    if not check:
-        print(f"written: {SPEC.name}, {DOC.name}")
+    SPEC.write_text(spec_text)
+    DOC.write_text(doc_text)
+    print(f"written: {SPEC.name}, {DOC.name}")
     return 0
 
 
