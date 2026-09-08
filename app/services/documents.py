@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
+import re
 import shutil
 import tempfile
 from pathlib import Path
+
+from PIL import Image, ImageOps
 
 from app.errors import Invalid, TooLarge
 
@@ -32,10 +36,20 @@ UNSUPPORTED_IMAGE = {"image/heic", "image/heif"}
 
 
 MAX_PAGES = 600
+MAX_PHOTOS = 20
+PHOTO_LONG_EDGE = 1568
+PHOTO_QUALITY = 88
+PHOTO_DPI = 150.0
 
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def content_digest(parts: list[bytes]) -> str:
+    if len(parts) == 1:
+        return sha256_bytes(parts[0])
+    return sha256_bytes("\n".join(sha256_bytes(p) for p in parts).encode())
 
 
 def classify(media_type: str) -> str:
@@ -55,28 +69,95 @@ def method_for(kind: str) -> str:
     return "photo" if kind == "image" else "document"
 
 
-def guard_size(data: bytes, limit: int) -> None:
-    if len(data) > limit:
-        raise TooLarge(f"Berkas {len(data) // 1_048_576} MB melampaui batas {limit // 1_048_576} MB.")
+def guard_supported_image(media_type: str) -> None:
+    if (media_type or "").split(";")[0].strip().lower() in UNSUPPORTED_IMAGE:
+        raise Invalid(
+            "Format HEIC belum didukung. Aplikasi Android mengubah foto ke JPEG "
+            "sebelum mengunggah.",
+            code="unsupported_media",
+        )
+
+
+def batch_method(media_types: list[str]) -> str:
+    if not media_types:
+        raise Invalid("Tidak ada berkas yang dikirim.")
+    if len(media_types) > MAX_PHOTOS:
+        raise Invalid(
+            f"Satu materi menampung paling banyak {MAX_PHOTOS} foto, "
+            f"dikirim {len(media_types)}.",
+            code="too_many_photos",
+        )
+
+    kinds = [classify(mt) for mt in media_types]
+    if len(kinds) == 1:
+        return method_for(kinds[0])
+
+    if set(kinds) != {"image"}:
+        raise Invalid(
+            "Beberapa berkas sekaligus hanya berlaku untuk foto. Kirim dokumen satu per satu.",
+            code="mixed_upload",
+        )
+    for mt in media_types:
+        guard_supported_image(mt)
+    return "photo"
+
+
+def guard_size(size: int, limit: int) -> None:
+    if size > limit:
+        raise TooLarge(f"Berkas {size // 1_048_576} MB melampaui batas {limit // 1_048_576} MB.")
+
+
+PDF_PAGE = re.compile(rb"/Type\s*/Page(?!\w)")
 
 
 def pdf_page_count(data: bytes) -> int | None:
     if not data.startswith(b"%PDF"):
         return None
-    n = data.count(b"/Type/Page") + data.count(b"/Type /Page")
-    return n or None
+    return len(PDF_PAGE.findall(data)) or None
+
+
+def _page(data: bytes) -> Image.Image:
+    try:
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+        image.load()
+    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+        raise Invalid(
+            "Salah satu foto tidak dapat dibaca. Kirim ulang dalam format JPG, PNG, atau WEBP.",
+            code="unreadable_photo",
+        ) from exc
+
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    longest = max(image.size)
+    if longest > PHOTO_LONG_EDGE:
+        scale = PHOTO_LONG_EDGE / longest
+        image = image.resize(
+            (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
+            Image.Resampling.LANCZOS,
+        )
+    return image
+
+
+def _pages_to_pdf(parts: list[bytes]) -> bytes:
+    pages = [_page(p) for p in parts]
+    out = io.BytesIO()
+    pages[0].save(
+        out, "PDF", save_all=True, append_images=pages[1:],
+        quality=PHOTO_QUALITY, resolution=PHOTO_DPI,
+    )
+    return out.getvalue()
+
+
+async def photos_to_pdf(parts: list[bytes]) -> bytes:
+    return await asyncio.to_thread(_pages_to_pdf, parts)
 
 
 async def to_attachment_bytes(*, data: bytes, media_type: str) -> tuple[bytes, str]:
     mt = (media_type or "").split(";")[0].strip().lower()
     kind = classify(mt)
 
-    if mt in UNSUPPORTED_IMAGE:
-        raise Invalid(
-            "Format HEIC belum didukung. Aplikasi Android mengubah foto ke JPEG "
-            "sebelum mengunggah.",
-            code="unsupported_media",
-        )
+    guard_supported_image(mt)
 
     if kind in ("pdf", "image", "text"):
         return data, mt
