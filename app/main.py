@@ -32,8 +32,7 @@ log = logging.getLogger("brainxp")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     s = settings()
-    log.info("BrainXP API up · env=%s · llm=%s", s.app_env,
-             "anthropic" if s.llm_enabled else "stub")
+    log.info("BrainXP API up · env=%s · llm=%s", s.app_env, s.llm_label)
     weak = weak_secret_reason(s.app_env, s.jwt_secret)
     if weak:
         raise RuntimeError(f"{weak} Set it to 64 random characters before running in production.")
@@ -81,7 +80,7 @@ if settings().origins:
 
 @api.get("/health", tags=["ops"])
 async def health():
-    return {"status": "ok", "llm": "anthropic" if settings().llm_enabled else "stub"}
+    return {"status": "ok", "llm": settings().llm_label}
 
 
 for r in (auth, families, policies, apps, materials, quizzes, ledger, reports, guardian):

@@ -256,7 +256,7 @@ async def run(db: AsyncConnection, material_id: uuid.UUID) -> None:
         await db.execute(
             T.question_sets.insert().values(
                 material_id=material_id,
-                model_id=(getattr(llm, "_s", None) and llm._s.model_generation) or "stub",
+                model_id=llm.generation_model,
                 prompt_version=PROMPT_VERSION,
                 requested_count=want,
                 status="partial",

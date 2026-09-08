@@ -22,8 +22,11 @@ docker compose up -d
 docker compose run --rm api python -m app.migrate
 ```
 
-Leave `ANTHROPIC_API_KEY` empty and the backend still runs, falling back to a
-stub provider. Handy for walking the whole flow without paying for API calls.
+Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or both. With both, every call
+goes to Anthropic first and moves to OpenRouter only when Anthropic fails with
+a network or API error; OpenRouter is asked for the same Claude models under
+its `anthropic/` prefix. Leave both empty and the backend still runs on a stub
+provider, handy for walking the whole flow without paying for API calls.
 Check `/health` to see which one is live.
 
 The same goes for `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT`: leave them empty
