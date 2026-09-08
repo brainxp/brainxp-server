@@ -1,0 +1,213 @@
+from __future__ import annotations
+
+import logging
+import uuid
+from collections.abc import Sequence
+from datetime import datetime, timedelta
+
+from sqlalchemy import and_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncConnection
+
+from app import tables as T
+from app.security import now
+from app.services import push as PU
+
+log = logging.getLogger("brainxp.guardian")
+
+HEARTBEAT_GRACE = timedelta(minutes=5)
+HEARTBEAT_SILENCE = timedelta(minutes=15)
+SWEEP_INTERVAL = 120
+
+ACCESSIBILITY_OFF = "accessibility_off"
+USAGE_ACCESS_OFF = "usage_access_off"
+OVERLAY_OFF = "overlay_off"
+PROTECTION_DISABLED = "protection_disabled"
+DEVICE_SILENT = "device_silent"
+
+KINDS = (ACCESSIBILITY_OFF, USAGE_ACCESS_OFF, OVERLAY_OFF, PROTECTION_DISABLED, DEVICE_SILENT)
+
+REVOKED = "permission_revoked"
+RESTORED = "permission_restored"
+FAILING = ("degraded", "disabled")
+
+PERMISSION_KINDS = {
+    "accessibility": ACCESSIBILITY_OFF,
+    "usage_access": USAGE_ACCESS_OFF,
+    "overlay": OVERLAY_OFF,
+}
+
+STATUS_DETAILS = {
+    "degraded": "Sebagian izin BrainXP dicabut, jadi penjagaannya tidak utuh.",
+    "disabled": "BrainXP dimatikan di ponselnya.",
+}
+
+PERMISSION_LABELS = {
+    "accessibility": "aksesibilitas",
+    "usage_access": "akses penggunaan",
+    "overlay": "tampil di atas aplikasi lain",
+}
+
+HEADLINES = {
+    ACCESSIBILITY_OFF: "Game di ponsel {name} tidak terkunci",
+    USAGE_ACCESS_OFF: "Waktu bermain {name} tidak terhitung",
+    OVERLAY_OFF: "Layar kunci tidak muncul di ponsel {name}",
+    PROTECTION_DISABLED: "BrainXP berhenti menjaga ponsel {name}",
+    DEVICE_SILENT: "Ponsel {name} tidak terhubung",
+}
+
+BODIES = {
+    ACCESSIBILITY_OFF:
+        "Izin aksesibilitas dicabut, jadi game tidak bisa ditahan lagi. "
+        "Nyalakan lewat Pengaturan di ponsel {name}.",
+    USAGE_ACCESS_OFF:
+        "Izin akses penggunaan dicabut, jadi BrainXP tidak tahu aplikasi mana yang "
+        "sedang dibuka. Nyalakan lewat Pengaturan di ponsel {name}.",
+    OVERLAY_OFF:
+        "Izin tampil di atas aplikasi lain dicabut, jadi game tetap terbuka walau "
+        "saldo habis. Nyalakan lewat Pengaturan di ponsel {name}.",
+    PROTECTION_DISABLED:
+        "Selama mati, {name} bisa bermain tanpa mengerjakan soal. "
+        "Buka BrainXP di ponselnya untuk menyalakan lagi.",
+    DEVICE_SILENT:
+        "Saldo waktunya dibekukan sampai tersambung lagi.",
+}
+
+FALLBACK_HEADLINE = "Ada yang perlu diperiksa di ponsel {name}"
+FALLBACK_BODY = "Buka BrainXP untuk melihat apa yang terjadi."
+
+DETAIL_IN_PUSH = {DEVICE_SILENT}
+
+
+def protection_lost(previous: str | None, current: str) -> bool:
+    return current in FAILING and previous not in FAILING
+
+
+def protection_regained(previous: str | None, current: str) -> bool:
+    return current == "ok" and previous in FAILING
+
+
+def revoked_detail(permission: str) -> str:
+    label = PERMISSION_LABELS.get(permission, permission)
+    return f"Izin {label} dicabut dari BrainXP."
+
+
+def silence_detail(last_seen: datetime, at: datetime) -> str:
+    minutes = max(1, int((at - last_seen).total_seconds() // 60))
+    return f"Sudah {minutes} menit tidak ada kabar dari ponselnya."
+
+
+def notification_text(kind: str, name: str, detail: str | None = None) -> tuple[str, str]:
+    title = HEADLINES.get(kind, FALLBACK_HEADLINE).format(name=name)
+    body = (BODIES.get(kind) or FALLBACK_BODY).format(name=name)
+    if detail and kind in DETAIL_IN_PUSH:
+        return title, f"{detail} {body}"
+    return title, body
+
+
+def still_open():
+    return and_(
+        T.guardian_alerts.c.acknowledged_at.is_(None),
+        T.guardian_alerts.c.resolved_at.is_(None),
+    )
+
+
+async def raise_alert(
+    db: AsyncConnection, *, subject_id: uuid.UUID, kind: str,
+    detail: str | None = None, device_id: uuid.UUID | None = None,
+) -> int | None:
+    stmt = pg_insert(T.guardian_alerts).values(
+        subject_id=subject_id, device_id=device_id, kind=kind, detail=detail,
+    )
+    return (
+        await db.execute(
+            stmt.on_conflict_do_nothing(
+                index_elements=[T.guardian_alerts.c.subject_id, T.guardian_alerts.c.kind],
+                index_where=still_open(),
+            ).returning(T.guardian_alerts.c.id)
+        )
+    ).scalar()
+
+
+async def resolve(db: AsyncConnection, *, subject_id: uuid.UUID, kinds: Sequence[str]) -> None:
+    if not kinds:
+        return
+    await db.execute(
+        T.guardian_alerts.update().where(
+            T.guardian_alerts.c.subject_id == subject_id,
+            T.guardian_alerts.c.kind.in_(kinds),
+            still_open(),
+        ).values(resolved_at=now())
+    )
+
+
+async def deliver(
+    db: AsyncConnection, *, subject_id: uuid.UUID, kind: str,
+    alert_id: int, detail: str | None = None,
+) -> None:
+    name = (
+        await db.execute(select(T.subjects.c.display_name).where(T.subjects.c.id == subject_id))
+    ).scalar()
+    if name is None:
+        return
+    tokens = await PU.recipients(db, subject_id)
+    if not tokens:
+        log.info("alert %s for %s has nobody to notify", kind, subject_id)
+        return
+    title, body = notification_text(kind, name, detail)
+    note = PU.Notification(
+        title=title, body=body,
+        data={"alert_id": alert_id, "kind": kind, "subject_id": subject_id},
+    )
+    try:
+        dead = await PU.sender().send(tokens, note)
+    except Exception:
+        log.exception("could not deliver alert %s for %s", kind, subject_id)
+        return
+    await PU.prune(db, dead)
+
+
+def already_told(kind: str):
+    return (
+        select(T.guardian_alerts.c.id).where(
+            T.guardian_alerts.c.subject_id == T.devices.c.subject_id,
+            T.guardian_alerts.c.kind == kind,
+            T.guardian_alerts.c.created_at > T.devices.c.last_heartbeat_at,
+        ).exists()
+    )
+
+
+def silent_devices(cutoff: datetime):
+    return (
+        select(
+            T.devices.c.id, T.devices.c.subject_id, T.devices.c.last_heartbeat_at,
+        )
+        .join(T.subjects, T.subjects.c.id == T.devices.c.subject_id)
+        .where(
+            T.devices.c.unbound_at.is_(None),
+            T.subjects.c.deleted_at.is_(None),
+            T.devices.c.last_heartbeat_at.isnot(None),
+            T.devices.c.last_heartbeat_at < cutoff,
+            ~already_told(DEVICE_SILENT),
+        )
+    )
+
+
+async def sweep(db: AsyncConnection) -> int:
+    at = now()
+    rows = (await db.execute(silent_devices(at - HEARTBEAT_SILENCE))).mappings().all()
+    raised = 0
+    for row in rows:
+        detail = silence_detail(row["last_heartbeat_at"], at)
+        alert_id = await raise_alert(
+            db, subject_id=row["subject_id"], kind=DEVICE_SILENT,
+            detail=detail, device_id=row["id"],
+        )
+        if alert_id is None:
+            continue
+        raised += 1
+        await deliver(
+            db, subject_id=row["subject_id"], kind=DEVICE_SILENT,
+            alert_id=alert_id, detail=detail,
+        )
+    return raised
