@@ -23,14 +23,15 @@ docker compose run --rm api python -m app.migrate
 ```
 
 Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or both. With both, every call
-goes to Anthropic first and moves to OpenRouter only when Anthropic fails with
-a network or API error; OpenRouter is asked for the same Claude models under
-its `anthropic/` prefix. Leave both empty and the backend still runs on a stub
-provider, handy for walking the whole flow without paying for API calls.
-Check `/health` to see which one is live.
+goes to Anthropic first and falls back to OpenRouter when Anthropic fails with
+a network or API error. OpenRouter serves the same Claude models under its
+`anthropic/` prefix, so there is no second set of model names to keep in step.
+Leave both empty and the backend still runs on a stub provider. Handy for
+walking the whole flow without paying for API calls. Check `/health` to see
+which of them is live.
 
-On the server, `OPENROUTER_API_KEY` is written into `.env` by every deploy from
-the GitHub secret of the same name, so it never has to be typed in by hand.
+Every deploy writes `OPENROUTER_API_KEY` into the server's `.env` from the
+GitHub secret of the same name, so nobody types it in by hand.
 
 The same goes for `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT`: leave them empty
 and guardian alerts are still raised and readable over the API, they just are
@@ -66,17 +67,18 @@ The essay marker never sees the source material, only the rubric and the
 student's answer. The rubric is frozen when the question is written, long
 before any answer exists.
 
-A handout photographed page by page is one material, not one per page. The
-upload endpoint takes several parts named `file`; more than one has to be
-photos, and they are stitched into a single PDF before anything else touches
-them. So six photos give one question set and one quiz session, and a question
-can reason across pages. Each page is turned upright from its EXIF orientation
-and scaled to the model's vision limit, which is why the merged PDF usually
-comes out smaller than the photos that went in.
+Photograph a handout page by page and it arrives as one material. The upload
+endpoint takes several parts named `file`, and more than one has to be photos.
+The server stitches them into a single PDF before anything else touches them,
+so six photos give one question set and one quiz session, and a question can
+come from any of the pages. It turns each page upright from its EXIF
+orientation and scales it to the model's vision limit, which is why the merged
+PDF usually comes out smaller than the photos that went in.
 
 Migrations are append-only. Add a new
-`migrations/<YYYYMMDDHHMMSS>_<verb>_<what>.up.sql` together with its `.down.sql`;
-a `create_` file makes exactly one table. Never edit one that has already run.
+`migrations/<YYYYMMDDHHMMSS>_<verb>_<what>.up.sql` together with its
+`.down.sql`. A `create_` file makes exactly one table. Never edit one that has
+already run.
 
 ## Tests
 
@@ -96,8 +98,8 @@ python scripts/gen_openapi.py
 ```
 
 `openapi.json` and `API.md` are built from the source. Only `openapi.json` is
-committed; a test fails when it drifts from the routers. `API.md` is a local
-copy for reading and stays out of git.
+committed, and a test fails when it drifts from the routers. `API.md` is a
+local copy for reading and stays out of git.
 
 ## Branches
 
