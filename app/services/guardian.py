@@ -38,8 +38,8 @@ PERMISSION_KINDS = {
 }
 
 STATUS_DETAILS = {
-    "degraded": "Sebagian izin pengawas dicabut di ponsel anak.",
-    "disabled": "Pengawas dimatikan di ponsel anak.",
+    "degraded": "Sebagian izin BrainXP dicabut, jadi penjagaannya tidak utuh.",
+    "disabled": "BrainXP dimatikan di ponselnya.",
 }
 
 PERMISSION_LABELS = {
@@ -49,20 +49,34 @@ PERMISSION_LABELS = {
 }
 
 HEADLINES = {
-    ACCESSIBILITY_OFF: "Izin aksesibilitas dimatikan",
-    USAGE_ACCESS_OFF: "Izin akses penggunaan dimatikan",
-    OVERLAY_OFF: "Izin tampil di atas aplikasi lain dimatikan",
-    PROTECTION_DISABLED: "Pengawas dimatikan di perangkat",
-    DEVICE_SILENT: "Perangkat berhenti melapor",
+    ACCESSIBILITY_OFF: "Game di ponsel {name} tidak terkunci",
+    USAGE_ACCESS_OFF: "Waktu bermain {name} tidak terhitung",
+    OVERLAY_OFF: "Layar kunci tidak muncul di ponsel {name}",
+    PROTECTION_DISABLED: "BrainXP berhenti menjaga ponsel {name}",
+    DEVICE_SILENT: "Ponsel {name} tidak terhubung",
 }
 
 BODIES = {
-    ACCESSIBILITY_OFF: "BrainXP tidak lagi dapat mengunci game di ponsel {name}.",
-    USAGE_ACCESS_OFF: "BrainXP tidak lagi dapat melihat aplikasi yang dibuka {name}.",
-    OVERLAY_OFF: "BrainXP tidak lagi dapat menampilkan layar kunci di ponsel {name}.",
-    PROTECTION_DISABLED: "Pengawasan di ponsel {name} sedang tidak aktif.",
-    DEVICE_SILENT: "Ponsel {name} berhenti melapor. Saldo waktunya dibekukan.",
+    ACCESSIBILITY_OFF:
+        "Izin aksesibilitas dicabut, jadi game tidak bisa ditahan lagi. "
+        "Nyalakan lewat Pengaturan di ponsel {name}.",
+    USAGE_ACCESS_OFF:
+        "Izin akses penggunaan dicabut, jadi BrainXP tidak tahu aplikasi mana yang "
+        "sedang dibuka. Nyalakan lewat Pengaturan di ponsel {name}.",
+    OVERLAY_OFF:
+        "Izin tampil di atas aplikasi lain dicabut, jadi game tetap terbuka walau "
+        "saldo habis. Nyalakan lewat Pengaturan di ponsel {name}.",
+    PROTECTION_DISABLED:
+        "Selama mati, {name} bisa bermain tanpa mengerjakan soal. "
+        "Buka BrainXP di ponselnya untuk menyalakan lagi.",
+    DEVICE_SILENT:
+        "Saldo waktunya dibekukan sampai tersambung lagi.",
 }
+
+FALLBACK_HEADLINE = "Ada yang perlu diperiksa di ponsel {name}"
+FALLBACK_BODY = "Buka BrainXP untuk melihat apa yang terjadi."
+
+DETAIL_IN_PUSH = {DEVICE_SILENT}
 
 
 def protection_lost(previous: str | None, current: str) -> bool:
@@ -75,12 +89,20 @@ def protection_regained(previous: str | None, current: str) -> bool:
 
 def revoked_detail(permission: str) -> str:
     label = PERMISSION_LABELS.get(permission, permission)
-    return f"Izin {label} dicabut di ponsel anak."
+    return f"Izin {label} dicabut dari BrainXP."
 
 
 def silence_detail(last_seen: datetime, at: datetime) -> str:
     minutes = max(1, int((at - last_seen).total_seconds() // 60))
-    return f"Tidak ada laporan selama {minutes} menit."
+    return f"Sudah {minutes} menit tidak ada kabar dari ponselnya."
+
+
+def notification_text(kind: str, name: str, detail: str | None = None) -> tuple[str, str]:
+    title = HEADLINES.get(kind, FALLBACK_HEADLINE).format(name=name)
+    body = (BODIES.get(kind) or FALLBACK_BODY).format(name=name)
+    if detail and kind in DETAIL_IN_PUSH:
+        return title, f"{detail} {body}"
+    return title, body
 
 
 def still_open():
@@ -132,9 +154,9 @@ async def deliver(
     if not tokens:
         log.info("alert %s for %s has nobody to notify", kind, subject_id)
         return
+    title, body = notification_text(kind, name, detail)
     note = PU.Notification(
-        title=HEADLINES.get(kind, "Peringatan pengawas"),
-        body=detail or BODIES.get(kind, "").format(name=name),
+        title=title, body=body,
         data={"alert_id": alert_id, "kind": kind, "subject_id": subject_id},
     )
     try:

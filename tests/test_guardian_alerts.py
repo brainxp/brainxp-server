@@ -75,6 +75,65 @@ def test_every_kind_has_something_to_show_in_a_notification():
     assert not missing, f"kinds with no push copy: {missing}"
 
 
+@pytest.mark.parametrize("kind", G.KINDS)
+def test_a_notification_says_whose_phone_it_is(kind):
+    title, body = G.notification_text(kind, "Rozan")
+    assert "Rozan" in f"{title} {body}", (
+        "a parent with two children cannot act on a warning that never says which "
+        "phone broke"
+    )
+
+
+@pytest.mark.parametrize("kind", G.KINDS)
+def test_a_notification_body_is_not_the_headline_said_twice(kind):
+    title, body = G.notification_text(kind, "Rozan")
+    assert body, f"{kind} arrives with an empty body"
+    assert body != title
+    assert title.rstrip(".") not in body, (
+        f"{kind} spends the body repeating the title and tells the parent nothing new"
+    )
+
+
+@pytest.mark.parametrize("kind", G.KINDS)
+def test_a_notification_never_calls_the_child_the_child(kind):
+    title, body = G.notification_text(kind, "Rozan")
+    assert "anak" not in f"{title} {body}".lower(), (
+        "the subject has a name and the server already knows it"
+    )
+
+
+@pytest.mark.parametrize("kind", sorted(G.PERMISSION_KINDS.values()))
+def test_a_revoked_permission_says_how_to_put_it_back(kind):
+    _, body = G.notification_text(kind, "Rozan")
+    assert "Nyalakan" in body, (
+        "a parent who reads that a permission is gone still has to be told where to "
+        "turn it on"
+    )
+
+
+def test_the_line_written_for_the_feed_does_not_become_the_push_body():
+    detail = G.revoked_detail("accessibility")
+    _, body = G.notification_text(G.ACCESSIBILITY_OFF, "Rozan", detail=detail)
+    assert body != detail, (
+        "the detail is the one-line summary the alert list shows under a heading "
+        "that already names the kind; sent as the push body it drops the name, the "
+        "consequence, and the fix"
+    )
+
+
+def test_a_silent_phone_pushes_how_long_it_has_been_quiet():
+    at = now()
+    detail = G.silence_detail(at - timedelta(minutes=22), at)
+    _, body = G.notification_text(G.DEVICE_SILENT, "Rozan", detail=detail)
+    assert "22 menit" in body
+    assert "dibekukan" in body, "how long it has been quiet is only half the news"
+
+
+def test_an_unknown_kind_still_reads_as_a_sentence():
+    title, body = G.notification_text("something_new", "Rozan")
+    assert "Rozan" in title and body and "{" not in f"{title} {body}"
+
+
 def test_every_permission_maps_onto_a_kind():
     assert set(G.PERMISSION_KINDS.values()) <= set(G.KINDS)
     assert set(G.PERMISSION_KINDS) == set(G.PERMISSION_LABELS), (
@@ -158,8 +217,10 @@ def test_protection_coming_back_is_recognised():
 
 def test_the_silence_detail_counts_whole_minutes_in_indonesian():
     at = now()
-    assert G.silence_detail(at - timedelta(minutes=22), at) == "Tidak ada laporan selama 22 menit."
-    assert G.silence_detail(at, at) == "Tidak ada laporan selama 1 menit.", (
+    assert G.silence_detail(at - timedelta(minutes=22), at) == (
+        "Sudah 22 menit tidak ada kabar dari ponselnya."
+    )
+    assert G.silence_detail(at, at) == "Sudah 1 menit tidak ada kabar dari ponselnya.", (
         "a zero would read as though the phone were fine"
     )
 
@@ -228,6 +289,11 @@ async def test_a_silent_phone_raises_one_alert_and_one_push(monkeypatch):
         "the app deep-links to the alert and acknowledges it by id, so the id has to "
         "travel with the notification"
     )
+    assert "Dimas" in note.title
+    assert note.body.startswith("Sudah 40 menit"), (
+        "the watchdog measured the silence, so the push says how long it has been"
+    )
+    assert "dibekukan" in note.body
 
 
 async def test_a_push_that_fails_does_not_lose_the_alert(monkeypatch):
