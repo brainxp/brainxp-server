@@ -122,6 +122,7 @@ jobs:
             IMAGE_WORKER="${{ env.IMAGE_WORKER }}:${{ needs.build.outputs.sha }}" \
             GH_ACTOR="${{ github.actor }}" \
             GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            OPENROUTER_API_KEY="${{ secrets.OPENROUTER_API_KEY }}" \
             bash -s <<'REMOTE'
           set -euo pipefail
           cd /opt/brainxp
@@ -131,6 +132,9 @@ jobs:
 
           grep -q '^IMAGE_API='    .env && sed -i "s|^IMAGE_API=.*|IMAGE_API=$IMAGE_API|"       .env || echo "IMAGE_API=$IMAGE_API"       >> .env
           grep -q '^IMAGE_WORKER=' .env && sed -i "s|^IMAGE_WORKER=.*|IMAGE_WORKER=$IMAGE_WORKER|" .env || echo "IMAGE_WORKER=$IMAGE_WORKER" >> .env
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            grep -q '^OPENROUTER_API_KEY=' .env && sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$OPENROUTER_API_KEY|" .env || echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" >> .env
+          fi
 
           "${DC[@]}" pull api worker </dev/null
           "${DC[@]}" run --rm -T api python -m app.migrate </dev/null
