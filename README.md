@@ -60,8 +60,9 @@ The essay marker never sees the source material, only the rubric and the
 student's answer. The rubric is frozen when the question is written, long
 before any answer exists.
 
-Migrations are append-only. Add a new `migrations/00N_*.sql`; never edit one
-that has already run.
+Migrations are append-only. Add a new
+`migrations/<YYYYMMDDHHMMSS>_<verb>_<what>.up.sql` together with its `.down.sql`;
+a `create_` file makes exactly one table. Never edit one that has already run.
 
 ## Tests
 
