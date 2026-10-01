@@ -258,6 +258,58 @@ async def answer(session_id: uuid.UUID, body: S.AnswerIn, db: Conn, me: Me):
     )
 
 
+REPORT_RECEIVED = (
+    "Laporanmu sudah dicatat dan akan kami periksa. Penilaian soal ini tidak berubah."
+)
+
+
+@router.post(
+    "/quizzes/{session_id}/reports", response_model=S.QuestionReportOut, status_code=201
+)
+async def report_question(session_id: uuid.UUID, body: S.QuestionReportIn, db: Conn, me: Me):
+    ses = await _load(db, session_id)
+    await authorize_subject(db, me, ses["subject_id"])
+    if not await RL.hit(f"report:{ses['subject_id']}", RL.REPORT_PER_SUBJECT):
+        raise RateLimited("Terlalu banyak laporan dalam sejam. Coba lagi nanti.")
+
+    question_set_id = (
+        await db.execute(
+            select(T.questions.c.question_set_id).where(T.questions.c.id == body.question_id)
+        )
+    ).scalar()
+    if question_set_id is None or question_set_id != ses["question_set_id"]:
+        raise NotFound("Soal tidak ada di sesi ini.")
+
+    note = (body.note or "").strip() or None
+    if body.reason == "lainnya" and not note:
+        raise Invalid("Ceritakan singkat apa yang salah dengan soal ini.")
+
+    values = {
+        "session_id": session_id,
+        "question_id": body.question_id,
+        "subject_id": ses["subject_id"],
+        "reporter_role": me.role,
+        "reason": body.reason,
+        "note": note,
+    }
+    report_id = (
+        await db.execute(
+            pg_insert(T.question_reports).values(**values).on_conflict_do_update(
+                index_elements=[T.question_reports.c.session_id, T.question_reports.c.question_id],
+                set_={
+                    "reporter_role": me.role, "reason": body.reason, "note": note,
+                    "updated_at": now(), "reviewed_at": None,
+                },
+            ).returning(T.question_reports.c.id)
+        )
+    ).scalar_one()
+
+    return S.QuestionReportOut(
+        id=report_id, question_id=body.question_id, reason=body.reason,
+        message=REPORT_RECEIVED,
+    )
+
+
 @router.post("/quizzes/{session_id}/submit", response_model=S.ReceiptOut)
 async def submit(session_id: uuid.UUID, db: Conn, me: Me):
     ses = await _load(db, session_id)

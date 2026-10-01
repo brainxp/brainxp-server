@@ -245,6 +245,22 @@ class AnswerSavedOut(BaseModel):
     total_count: int
 
 
+ReportReason = Literal["kunci_salah", "soal_tidak_jelas", "di_luar_materi", "lainnya"]
+
+
+class QuestionReportIn(BaseModel):
+    question_id: uuid.UUID
+    reason: ReportReason
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class QuestionReportOut(BaseModel):
+    id: int
+    question_id: uuid.UUID
+    reason: ReportReason
+    message: str
+
+
 class ReceiptRow(BaseModel):
     ordinal: int
     label: str

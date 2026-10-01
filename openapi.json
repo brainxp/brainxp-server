@@ -1650,6 +1650,78 @@
         "title": "QuestionPublic",
         "type": "object"
       },
+      "QuestionReportIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "kunci_salah",
+              "soal_tidak_jelas",
+              "di_luar_materi",
+              "lainnya"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id",
+          "reason"
+        ],
+        "title": "QuestionReportIn",
+        "type": "object"
+      },
+      "QuestionReportOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "kunci_salah",
+              "soal_tidak_jelas",
+              "di_luar_materi",
+              "lainnya"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question_id",
+          "reason",
+          "message"
+        ],
+        "title": "QuestionReportOut",
+        "type": "object"
+      },
       "QuizOut": {
         "properties": {
           "answered_ids": {
@@ -3788,6 +3860,75 @@
           }
         },
         "summary": "Answer",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/quizzes/{session_id}/reports": {
+      "post": {
+        "operationId": "report_question_quizzes__session_id__reports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Question",
         "tags": [
           "quiz"
         ]
