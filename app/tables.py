@@ -304,3 +304,17 @@ guardian_alerts = Table(
     Column("acknowledged_at", DateTime(timezone=True)),
     Column("resolved_at", DateTime(timezone=True)),
 )
+
+question_reports = Table(
+    "question_reports", meta,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("session_id", _uuid, ForeignKey("quiz_sessions.id", ondelete="CASCADE"), nullable=False),
+    Column("question_id", _uuid, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False),
+    Column("subject_id", _uuid, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False),
+    Column("reporter_role", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("note", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("reviewed_at", DateTime(timezone=True)),
+)

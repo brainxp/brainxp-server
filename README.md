@@ -75,6 +75,26 @@ come from any of the pages. It turns each page upright from its EXIF
 orientation and scales it to the model's vision limit, which is why the merged
 PDF usually comes out smaller than the photos that went in.
 
+A student who thinks a question is broken can report it with
+`POST /quizzes/{session_id}/reports`, giving a reason (`kunci_salah`,
+`soal_tidak_jelas`, `di_luar_materi`, or `lainnya` with a note). This works
+while the quiz is open and after it is marked. A report changes nothing: the
+mark stands and no time is refunded, otherwise reporting every wrong answer
+would become a way to earn minutes. Reports exist so we can see where question
+generation goes wrong. Reporting the same question twice in one session updates
+the one report. Read them inside the API container:
+
+```bash
+docker compose exec api python -m app.question_reports           # open reports
+docker compose exec api python -m app.question_reports --jsonl   # for a dataset
+docker compose exec api python -m app.question_reports --done 12 13
+```
+
+Each entry shows the question, the answer key, what the student actually picked
+(translated back from the shuffled order on screen), the essay marker's notes,
+and the source excerpt. `--done` marks reports as reviewed; `--all` brings them
+back into the list.
+
 Migrations are append-only. Add a new
 `migrations/<YYYYMMDDHHMMSS>_<verb>_<what>.up.sql` together with its
 `.down.sql`. A `create_` file makes exactly one table. Never edit one that has
@@ -110,7 +130,8 @@ To add something, branch off `dev` (`feat/your-thing`) and open a PR back into
 
 ## Not done yet
 
-There is no way to dispute a wrong answer key. Material similarity still
+Reported questions are only collected; nothing re-grades them, refunds time, or
+pulls a broken question out of later sessions. Material similarity still
 compares topic summaries rather than embeddings, since Anthropic offers no
 embedding endpoint. The offline question bank can be fetched, but pre-generating
 it through the Batch API is not wired up. There are no integration tests; every
