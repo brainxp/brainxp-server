@@ -39,8 +39,13 @@ def test_a_create_file_makes_exactly_one_table(path):
     assert creates == [expected], f"{path.name} creates {creates}"
 
 
+def legacy_files():
+    last = max(LEGACY_BASELINE.values())
+    return [p for p in up_files() if p.name[:14] <= last]
+
+
 def test_legacy_ledger_rows_adopt_everything_up_to_their_stamp():
-    files = up_files()
+    files = legacy_files()
     adopted, todo = split_pending(files, {"001_init.sql", "002_weekly_caps_and_idle_lock.sql"})
     assert [p.name for p in todo] == [
         "20260907112627_create_installed_apps.up.sql",
@@ -52,8 +57,10 @@ def test_legacy_ledger_rows_adopt_everything_up_to_their_stamp():
 
 def test_a_fully_migrated_legacy_ledger_has_nothing_pending():
     adopted, todo = split_pending(up_files(), set(LEGACY_BASELINE))
-    assert not todo
-    assert len(adopted) == len(up_files())
+    assert todo == [p for p in up_files() if p not in legacy_files()], (
+        "only migrations written after the legacy names were retired may still run"
+    )
+    assert adopted == legacy_files()
 
 
 def test_a_fresh_database_runs_everything():
