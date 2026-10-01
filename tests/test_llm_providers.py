@@ -18,10 +18,36 @@ VERDICT = {
 }
 
 
+CLAUDE_MODELS = {
+    "model_generation": "claude-opus-5", "model_grading": "claude-opus-5",
+    "model_gate": "claude-haiku-4-5",
+}
+GEMINI_ENDPOINT = "https://vertex.test/v1/projects/p/locations/global/publishers/google/models"
+
+
 def with_keys(anthropic_key: str = "", openrouter_key: str = "", **overrides) -> Settings:
     return Settings(
         anthropic_api_key=anthropic_key, openrouter_api_key=openrouter_key,
         _env_file=None, **overrides,
+    )
+
+
+def claude_settings(anthropic_key: str = "", openrouter_key: str = "", **overrides) -> Settings:
+    return with_keys(anthropic_key, openrouter_key, **CLAUDE_MODELS, **overrides)
+
+
+def gemini_reply(payload: dict, finish: str = "STOP", thoughts: int = 0) -> dict:
+    parts = [{"text": "pikir dulu", "thought": True}] if thoughts else []
+    parts.append({"text": json.dumps(payload)})
+    return {
+        "candidates": [{"content": {"parts": parts}, "finishReason": finish}],
+        "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "thoughtsTokenCount": thoughts},
+    }
+
+
+def gemini(handler, **overrides) -> L.GeminiProvider:
+    return L.GeminiProvider(
+        with_keys(gemini_endpoint=GEMINI_ENDPOINT, **overrides), transport=httpx.MockTransport(handler)
     )
 
 
@@ -34,7 +60,7 @@ def completion(content: str, finish: str = "stop", native: str = "end_turn") -> 
 
 def openrouter(handler, **overrides) -> L.OpenRouterProvider:
     return L.OpenRouterProvider(
-        with_keys(openrouter_key="or-key", **overrides), transport=httpx.MockTransport(handler)
+        claude_settings(openrouter_key="or-key", **overrides), transport=httpx.MockTransport(handler)
     )
 
 
@@ -81,8 +107,9 @@ class FakeBackend:
     ("claude-haiku-4-5", "anthropic/claude-haiku-4.5"),
     ("claude-opus-4-8", "anthropic/claude-opus-4.8"),
     ("google/gemini-2.5-pro", "google/gemini-2.5-pro"),
+    ("gemini-3.8-flash", "google/gemini-3.8-flash"),
 ])
-def test_openrouter_asks_for_the_same_claude_models(anthropic_id, openrouter_id):
+def test_openrouter_asks_for_the_same_models(anthropic_id, openrouter_id):
     assert L.openrouter_model(anthropic_id) == openrouter_id
 
 
@@ -94,7 +121,7 @@ def test_without_any_key_the_stub_answers():
 
 
 def test_anthropic_alone_runs_alone():
-    s = with_keys(anthropic_key="a")
+    s = claude_settings(anthropic_key="a")
     assert type(L.build_provider(s)) is L.AnthropicProvider
     assert s.llm_label == "anthropic"
 
@@ -106,13 +133,39 @@ def test_openrouter_alone_runs_alone():
 
 
 def test_both_keys_put_anthropic_first_and_openrouter_behind_it():
-    s = with_keys(anthropic_key="a", openrouter_key="o")
+    s = claude_settings(anthropic_key="a", openrouter_key="o")
     p = L.build_provider(s)
     assert isinstance(p, L.FallbackProvider)
     assert isinstance(p.primary, L.AnthropicProvider)
     assert isinstance(p.backup, L.OpenRouterProvider)
     assert p.generation_model == "claude-opus-5"
     assert s.llm_label == "anthropic+openrouter"
+
+
+def test_a_gemini_endpoint_leads_and_openrouter_backs_it_up():
+    s = with_keys(anthropic_key="a", openrouter_key="o", gemini_endpoint=GEMINI_ENDPOINT)
+    p = L.build_provider(s)
+    assert isinstance(p, L.FallbackProvider)
+    assert isinstance(p.primary, L.GeminiProvider)
+    assert isinstance(p.backup, L.OpenRouterProvider), "a stale Anthropic key must not take the backup seat"
+    assert p.generation_model == "gemini-3.8-flash"
+    assert s.llm_label == "gemini+openrouter"
+
+
+def test_a_gemini_endpoint_alone_runs_alone():
+    s = with_keys(gemini_endpoint=GEMINI_ENDPOINT)
+    assert type(L.build_provider(s)) is L.GeminiProvider
+    assert s.llm_label == "gemini"
+
+
+def test_the_defaults_point_every_role_at_gemini_flash():
+    s = with_keys()
+    assert (s.model_gate, s.model_generation, s.model_grading) == ("gemini-3.8-flash",) * 3
+
+
+def test_gemini_ca_from_env_builds_the_verify_argument():
+    assert L.gemini_verify(with_keys()) is True
+    assert L.gemini_verify(with_keys(gemini_ca_file="/etc/ca.pem")) == "/etc/ca.pem"
 
 
 async def test_the_backup_is_only_asked_when_the_primary_fails():
@@ -202,7 +255,9 @@ async def test_openrouter_generation_uses_the_generation_model_and_budget():
     assert body["model"] == "anthropic/claude-opus-5"
     assert body["max_tokens"] == L.generation_token_budget(3)
     assert body["response_format"]["json_schema"]["name"] == "QuestionBatch"
-    assert "Buat tepat 3 soal" in body["messages"][1]["content"][2]["text"]
+    instruction = body["messages"][1]["content"][2]["text"]
+    assert "Buat 3 soal" in instruction
+    assert "buat lebih sedikit" in instruction, "the count is a target, not an order to pad"
 
 
 async def test_an_openrouter_error_body_becomes_unavailable():
@@ -253,12 +308,104 @@ async def test_an_anthropic_api_error_becomes_unavailable(monkeypatch):
         await p.validate_material(att=TEXT, declared_level="smp")
 
 
-def test_both_providers_build_from_one_prompt():
+def test_all_providers_build_from_one_prompt():
     req = L.gate_request(PNG, "smp")
     anthropic_blocks = L.AnthropicProvider.content(req.parts)
     openrouter_parts = [L.OpenRouterProvider.part(p) for p in req.parts]
-    assert anthropic_blocks[0]["text"] == openrouter_parts[0]["text"] == L.MATERIAL_OPENS
+    gemini_parts = [L.GeminiProvider.part(p) for p in req.parts]
+    assert anthropic_blocks[0]["text"] == openrouter_parts[0]["text"] == gemini_parts[0]["text"]
     assert anthropic_blocks[1]["type"] == "image"
     assert anthropic_blocks[1]["cache_control"] == {"type": "ephemeral"}
     assert openrouter_parts[1]["type"] == "image_url"
-    assert anthropic_blocks[2]["text"] == openrouter_parts[2]["text"]
+    assert gemini_parts[1]["inlineData"]["mimeType"] == "image/png"
+    assert anthropic_blocks[2]["text"] == openrouter_parts[2]["text"] == gemini_parts[2]["text"]
+
+
+async def test_gemini_sends_the_gate_prompt_to_the_model_endpoint():
+    rec = Recorder(httpx.Response(200, json=gemini_reply(VERDICT, thoughts=7)))
+    verdict = await gemini(rec).validate_material(att=PNG, declared_level="smp")
+
+    assert verdict == L.GateVerdict(**VERDICT)
+    assert str(rec.request.url) == GEMINI_ENDPOINT + "/gemini-3.8-flash:generateContent"
+    body = rec.body
+    assert body["systemInstruction"]["parts"][0]["text"] == L.GATE_SYSTEM
+    assert body["contents"][0]["parts"][1]["inlineData"]["mimeType"] == "image/png"
+    config = body["generationConfig"]
+    assert config["responseMimeType"] == "application/json"
+    assert config["responseSchema"]["properties"]["assessed_level"]["enum"][:2] == ["sd", "smp"]
+    assert config["responseSchema"]["properties"]["reject_reason"]["nullable"] is True
+    assert "temperature" not in config
+
+
+async def test_gemini_schema_carries_the_rubric_weight_limits():
+    rec = Recorder(httpx.Response(200, json=gemini_reply({"questions": []})))
+    await gemini(rec).generate_questions(
+        att=PNG, count=10, essays=2, academic_level="smp", language="id",
+    )
+
+    question = rec.body["generationConfig"]["responseSchema"]["properties"]["questions"]["items"]
+    weight = question["properties"]["rubric"]["items"]["properties"]["weight"]
+    assert weight == {
+        "type": "NUMBER", "description": "Must be at most 1 and greater than 0.", "maximum": 1.0,
+    }
+    assert rec.body["generationConfig"]["maxOutputTokens"] > L.generation_token_budget(10)
+
+
+async def test_gemini_grades_at_temperature_zero():
+    rec = Recorder(httpx.Response(200, json=gemini_reply({
+        "criteria": [{"criterion": "k", "met": True, "score": 100}], "total_score": 100, "feedback": "ok",
+    })))
+    rubric = [{"criterion": "k", "weight": 1, "indicator": "i"}]
+    verdict = await gemini(rec).grade_essay(stem="s", rubric=rubric, reference_answer="r", answer="a")
+    assert verdict.total_score == 100
+    assert rec.body["generationConfig"]["temperature"] == 0
+
+
+async def test_a_gemini_error_body_becomes_unavailable():
+    body = {"error": {"code": 503, "message": "The model is overloaded."}}
+    rec = Recorder(httpx.Response(503, json=body))
+    with pytest.raises(L.LLMUnavailable, match="503"):
+        await gemini(rec).validate_material(att=PNG, declared_level="smp")
+
+
+async def test_gemini_retries_a_transient_failure_once_then_succeeds(monkeypatch):
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if len(calls) == 1:
+            return httpx.Response(429, json={"error": {"message": "slow down"}})
+        return httpx.Response(200, json=gemini_reply(VERDICT))
+
+    async def no_sleep(_seconds):
+        return None
+
+    monkeypatch.setattr(L.asyncio, "sleep", no_sleep)
+    verdict = await gemini(handler).validate_material(att=PNG, declared_level="smp")
+    assert verdict.topic_summary == "fotosintesis"
+    assert len(calls) == 2
+
+
+async def test_a_gemini_safety_block_is_a_refusal():
+    rec = Recorder(httpx.Response(200, json={
+        "candidates": [{"content": {"parts": []}, "finishReason": "SAFETY"}],
+        "usageMetadata": {"promptTokenCount": 10},
+    }))
+    with pytest.raises(LLMRefused):
+        await gemini(rec).validate_material(att=PNG, declared_level="smp")
+
+
+async def test_a_gemini_reply_off_schema_becomes_unavailable():
+    rec = Recorder(httpx.Response(200, json=gemini_reply({"is_study_material": "maybe"})))
+    with pytest.raises(L.LLMUnavailable, match="GateVerdict"):
+        await gemini(rec).validate_material(att=PNG, declared_level="smp")
+
+
+def test_openrouter_schema_is_strict_enough_for_openai():
+    schema = L.strict_schema(L.QuestionBatch)
+    question = schema["$defs"]["GeneratedQuestion"]
+    assert schema["additionalProperties"] is False
+    assert question["required"] == list(question["properties"])
+    assert question["additionalProperties"] is False
+    weight = schema["$defs"]["RubricCriterion"]["properties"]["weight"]
+    assert weight == {"type": "number", "description": "Must be at most 1 and greater than 0."}

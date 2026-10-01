@@ -22,13 +22,17 @@ docker compose up -d
 docker compose run --rm api python -m app.migrate
 ```
 
-Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or both. With both, every call
-goes to Anthropic first and falls back to OpenRouter when Anthropic fails with
-a network or API error. OpenRouter serves the same Claude models under its
-`anthropic/` prefix, so there is no second set of model names to keep in step.
-Leave both empty and the backend still runs on a stub provider. Handy for
-walking the whole flow without paying for API calls. Check `/health` to see
-which of them is live.
+Every model call (checking the upload, writing the questions, grading an
+essay) goes to `gemini-3.8-flash`. Set `GEMINI_ENDPOINT` to the Vertex AI
+`publishers/google/models` URL of your project; `GEMINI_PROXY` and either
+`GEMINI_CA_FILE` or `GEMINI_CA_PEM_B64` are for reaching it through an
+authenticating proxy with its own certificate authority. With
+`OPENROUTER_API_KEY` set as well, a call that fails with a network or API
+error is retried through OpenRouter, which serves the same model as
+`google/gemini-3.8-flash`. Without a Gemini endpoint the old order applies:
+`ANTHROPIC_API_KEY` first, OpenRouter behind it. Leave every key empty and
+the backend still runs on a stub provider, handy for walking the whole flow
+without paying for API calls. Check `/health` to see which of them is live.
 
 Every deploy writes `OPENROUTER_API_KEY` into the server's `.env` from the
 GitHub secret of the same name, so nobody types it in by hand.

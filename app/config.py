@@ -38,11 +38,15 @@ class Settings(BaseSettings):
     access_ttl_seconds: int = 900
     refresh_ttl_seconds: int = 2_592_000
 
+    gemini_endpoint: str = ""
+    gemini_proxy: str = ""
+    gemini_ca_file: str = ""
+    gemini_ca_pem_b64: str = ""
     anthropic_api_key: str = ""
     openrouter_api_key: str = ""
-    model_generation: str = "claude-opus-5"
-    model_grading: str = "claude-opus-5"
-    model_gate: str = "claude-haiku-4-5"
+    model_generation: str = "gemini-3.8-flash"
+    model_grading: str = "gemini-3.8-flash"
+    model_gate: str = "gemini-3.8-flash"
     model_fallback: str = "claude-opus-4-8"
 
     s3_endpoint_url: str = ""
@@ -64,7 +68,10 @@ class Settings(BaseSettings):
 
     @property
     def llm_backends(self) -> list[str]:
-        keys = (("anthropic", self.anthropic_api_key), ("openrouter", self.openrouter_api_key))
+        if self.gemini_endpoint:
+            keys = (("gemini", self.gemini_endpoint), ("openrouter", self.openrouter_api_key))
+        else:
+            keys = (("anthropic", self.anthropic_api_key), ("openrouter", self.openrouter_api_key))
         return [name for name, key in keys if key]
 
     @property
